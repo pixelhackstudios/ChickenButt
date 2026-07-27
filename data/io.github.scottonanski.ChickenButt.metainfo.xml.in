@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@APP_ID@</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>@APP_NAME@</name>
+  <summary>Chat with local Ollama models</summary>
+
+  <developer id="io.github.scottonanski">
+    <name>Scott O'Nanski</name>
+  </developer>
+
+  <description>
+    <p>
+      ChickenButt is a lightweight desktop client for chatting with
+      Ollama models running on your own computer.
+    </p>
+    <p>
+      It provides streaming responses, local multi-chat history,
+      Markdown and code rendering, model controls, and clear Ollama
+      health information in a native GNOME application.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+
+  <provides>
+    <binary>chickenbutt</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/scottonanski/ChickenButt</url>
+  <url type="vcs-browser">https://github.com/scottonanski/ChickenButt</url>
+  <url type="bugtracker">https://github.com/scottonanski/ChickenButt/issues</url>
+
+  <content_rating type="oars-1.1"/>
+</component>

@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      NEEDRESTART_MODE: a
+      NEEDRESTART_SUSPEND: 1
+      # WebKitGTK's network/web process sandboxes itself via bubblewrap
+      # (bwrap), which needs unprivileged user namespaces -- not available
+      # on GitHub-hosted runners ("bwrap: setting up uid map: Permission
+      # denied"). Disabling WebKit's own sandbox doesn't weaken what these
+      # tests actually verify (CSP/sanitization/navigation-policy behavior
+      # at the JS/DOM level, not the OS sandbox itself).
+      WEBKIT_DISABLE_SANDBOX: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git meson ninja-build \
+            python3 python3-gi python3-dasbus \
+            gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-webkit-6.0 \
+            gir1.2-gdkpixbuf-2.0 \
+            desktop-file-utils appstream \
+            xvfb dbus dbus-x11
+
+      - name: Allow unprivileged user namespaces (bubblewrap needs this; Ubuntu 24.04+ restricts it via AppArmor by default)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Verify declared dependencies are actually present
+        run: python3 scripts/check_dependencies.py --build
+
+      - name: Run test suite (real GTK4/Adw/WebKit + real meson install; smoke_gui.py excluded, needs live Ollama)
+        run: |
+          xvfb-run -a dbus-run-session -- bash -eo pipefail -c '
+            status=0
+            for f in scripts/test_*.py; do
+              echo "::group::$f"
+              python3 "$f" || status=1
+              echo "::endgroup::"
+            done
+            exit $status
+          '

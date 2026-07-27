@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=@APP_NAME@
+GenericName=Local AI Chat Client
+Comment=Chat with local Ollama models
+Exec=chickenbutt
+TryExec=chickenbutt
+Icon=@APP_ID@
+Terminal=false
+Categories=Network;Chat;Utility;
+Keywords=Ollama;AI;LLM;Chat;Local;
+StartupNotify=true
+StartupWMClass=@APP_ID@
+SingleMainWindow=true
+DBusActivatable=false
