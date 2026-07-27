@@ -67,7 +67,7 @@ export default function Footer() {
         <p className="text-[11px] sm:text-xs text-(--ink-300) leading-relaxed">
           Also the reference client for the{' '}
           <a
-            href="https://pmm.lol"
+            href="https://github.com/scottonanski/persistent-mind-model-v1.0"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-(--ink-200) transition focus-ring rounded underline underline-offset-2"
