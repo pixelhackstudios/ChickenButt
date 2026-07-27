@@ -62,7 +62,7 @@ export default function Contribute() {
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-3.5 mt-auto pt-4">
               <a
-                href="https://github.com/scottonanski/ChickenButt"
+                href="https://github.com/pixelhackstudios/ChickenButt"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary px-6 py-3.5 text-[15px] focus-ring text-center gap-2 group"
@@ -71,7 +71,7 @@ export default function Contribute() {
                 <span className="transition-transform group-hover:translate-x-0.5">&rarr;</span>
               </a>
               <a
-                href="https://github.com/scottonanski/ChickenButt/issues"
+                href="https://github.com/pixelhackstudios/ChickenButt/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-outline bg-(--ink-950) hover:bg-(--ink-800) px-6 py-3.5 text-[15px] focus-ring text-center"
@@ -127,7 +127,7 @@ export default function Contribute() {
 
             <div className="mt-6 pt-4 border-t border-(--border-soft)">
               <a
-                href="https://github.com/scottonanski/ChickenButt/issues"
+                href="https://github.com/pixelhackstudios/ChickenButt/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[13px] font-medium text-(--green-300) hover:text-(--green-400) flex items-center gap-1.5 transition-colors group"

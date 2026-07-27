@@ -136,7 +136,7 @@ The installation includes:
 * The application runtime
 * A desktop launcher
 * App icons
-* AppStream metadata
+* AppStream metadata is installed
 
 Make sure this directory is on your `PATH`:
 
@@ -254,7 +254,7 @@ Please keep changes focused and verify the behavior you touched.
 
 ChickenButt is under active development.
 
-The desktop app is functional and installable from source. The public website is included in this repository. Packaging and distribution work, including Flatpak support, is still evolving.
+The desktop app is functional and installable from source. The public website is included in this repository. Screenshot/release metadata and Flatpak packaging remain unfinished.
 
 It is built primarily for GNOME-style Linux desktops, though other GTK-compatible environments may work.
 

@@ -44,12 +44,20 @@ export default function Footer() {
             Style Guide
           </a>
           <a
-            href="https://github.com/scottonanski/ChickenButt"
+            href="https://github.com/pixelhackstudios/ChickenButt"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-(--ink-50) transition focus-ring rounded py-1"
           >
             GitHub
+          </a>
+          <a
+            href="https://github.com/pixelhackstudios/ChickenButt/tree/main/chickenbutt-web"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-(--ink-50) transition focus-ring rounded py-1"
+          >
+            Website Source
           </a>
           <span className="badge">GPL-3.0-or-later</span>
         </div>

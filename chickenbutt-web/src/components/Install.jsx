@@ -124,7 +124,7 @@ export default function Install() {
           <InstallerPanel num="03" title="Get ChickenButt" path="~">
             <div className="term-line break-all sm:break-normal">
               <span className="term-prompt">$ </span>
-              git clone https://github.com/scottonanski/ChickenButt.git
+              git clone https://github.com/pixelhackstudios/ChickenButt.git
             </div>
             <div className="term-line">
               <span className="term-prompt">$ </span>cd ChickenButt
@@ -198,7 +198,7 @@ export default function Install() {
 
           <div className="mt-auto">
             <a
-              href="https://github.com/scottonanski/ChickenButt"
+              href="https://github.com/pixelhackstudios/ChickenButt"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-outline-solid px-5 py-3 text-[14px] focus-ring w-full group flex items-center justify-center gap-2"

@@ -6773,7 +6773,7 @@ def characterize_conversation_lifecycle(results: Results) -> None:
         persist_user._store.appended
         == [("active", "user", "hi", "user-fixed")]
         and persist_user.history_marked == 1
-        and idles == [persist_user._refresh_chat_title],
+        and idles == [persist_user._refresh_chat_title, persist_user._rebuild_history_list],
     )
     persist_asst = LifecycleOwner()
     idles.clear()

@@ -1,52 +1,144 @@
-# 🐔 chickenbutt-web
+<p align="center">
+  <img src="public/chickenbutt-logo.svg" width="220" alt="ChickenButt logo">
+</p>
 
-> The official website for **[ChickenButt](https://github.com/scottonanski/ChickenButt)** — the native GNOME desktop AI client.
+<h1 align="center">ChickenButt Website</h1>
 
-Designed and built with absurd attention to detail by **Scott O'Nanski** at **[Pixelhack Studios](https://www.pixelhackstudios.com)**.
+<p align="center">
+  The official website for
+  <a href="https://github.com/pixelhackstudios/ChickenButt"><strong>ChickenButt</strong></a>,
+  a native Linux desktop client for chatting with local Ollama models.
+</p>
 
----
+<p align="center">
+  Designed and built by <strong>Scott O'Nanski</strong> at
+  <a href="https://www.pixelhackstudios.com"><strong>Pixel Hack Studios</strong></a>.
+</p>
 
-### What is this?
+## About this directory
 
-This repository contains the codebase for the **ChickenButt landing page & web experience**. 
+`chickenbutt-web/` contains the public website for the ChickenButt project.
 
-It’s built to introduce the world to ChickenButt: a native Linux (GTK4 + libadwaita) desktop app that lets you talk to your local AI models running on Ollama — with zero tracking, no accounts, and zero nonsense.
+It is part of the main ChickenButt repository rather than a separate standalone repository:
 
----
+```text
+ChickenButt/
+├── chickenbutt-web/   Public React/Vite website
+├── web/               Embedded desktop transcript interface
+└── *.py               Native desktop application
+```
 
-### Features of the Web App
+The two web directories are unrelated:
 
-- 🎨 **Pixelhack Aesthetic** — Dark ink themes, custom gradients, typography (`Bungee` + `Geist`), and responsive UI.
-- ⚡ **Lightning Fast** — Built with Vite + React 19 + Tailwind CSS v4.
-- 📜 **Interactive Style Guide** — Built-in design system showcase (`#styleguide`).
-- 🐓 **Dynamic Mascot Motion** — Custom keyframe animations and mascot interactive elements.
+* `chickenbutt-web/` is the public project website.
+* `web/` is bundled with the desktop app and renders conversations inside WebKit.
 
----
+Please do not merge or confuse them. That would be bad. Probably not catastrophic, but definitely annoying.
 
-### Local Development
+## What is ChickenButt?
+
+ChickenButt is a native GTK4 and libadwaita desktop app for chatting with AI models running locally through [Ollama](https://ollama.com).
+
+It is built for people who want a straightforward local chat client without accounts, cloud lock-in, tracking, or an interface containing six dashboards and seventeen settings panels.
+
+The name was intentional.
+
+## Website features
+
+* Custom ChickenButt visual identity
+* Responsive desktop and mobile layouts
+* React 19 and Vite
+* Tailwind CSS v4
+* shadcn-based interface components
+* Custom typography using Bungee and Geist
+* Animated mascot and decorative elements
+* Product screenshots and feature sections
+* Installation and contribution information
+* Built-in visual style guide
+
+## Local development
+
+Clone the main repository:
 
 ```bash
-# Clone the repository
-git clone https://github.com/scottonanski/chickenbutt-web.git
-cd chickenbutt-web
+git clone https://github.com/pixelhackstudios/ChickenButt.git
+cd ChickenButt/chickenbutt-web
+```
 
-# Install dependencies
-npm install
+Install the exact dependency versions from the lockfile:
 
-# Start the dev server
+```bash
+npm ci
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
 
----
+Vite will print the local development address, normally:
 
-### Credits & Author
+```text
+http://localhost:5173/
+```
 
-**Designed & Developed by:**  
-**Scott O'Nanski**  
-🚀 **Pixelhack Studios** — [www.pixelhackstudios.com](https://www.pixelhackstudios.com)  
-🐙 **GitHub:** [@scottonanski](https://github.com/scottonanski)  
-📬 **Contact:** `whatsup@chickenbutt.dev`
+## Production build
 
----
+Create a production build:
 
-*GPL-3.0-or-later. Free software. The name was on purpose.*
+```bash
+npm run build
+```
+
+The generated website is written to:
+
+```text
+dist/
+```
+
+Both `dist/` and `node_modules/` are generated locally and are intentionally excluded from Git.
+
+## Project structure
+
+```text
+chickenbutt-web/
+├── .agents/           Agent instructions and development skills
+├── public/            Logos, mascot artwork, screenshots, and doodles
+├── src/
+│   ├── components/    Page sections and interface components
+│   ├── lib/           Shared utilities
+│   ├── App.jsx        Main website composition
+│   ├── index.css      Website styles and design tokens
+│   └── main.jsx       React entry point
+├── index.html
+├── package.json
+└── vite.config.js
+```
+
+## Agent-assisted development
+
+This directory includes its own agent instructions and skills:
+
+```text
+AGENTS.md
+.agents/skills/
+```
+
+Agents working on the website should read those instructions before making changes.
+
+The root repository also contains an `AGENTS.md` file covering rules shared across the desktop app and website.
+
+## Related links
+
+* [ChickenButt repository](https://github.com/pixelhackstudios/ChickenButt)
+* [Website source](https://github.com/pixelhackstudios/ChickenButt/tree/main/chickenbutt-web)
+* [Pixel Hack Studios](https://www.pixelhackstudios.com)
+* [Scott O'Nanski on GitHub](https://github.com/scottonanski)
+* Contact: `whatsup@chickenbutt.dev`
+
+## License
+
+ChickenButt is licensed under the GNU General Public License v3.0 or later.
+
+Free software. Local AI. Butt joke.
