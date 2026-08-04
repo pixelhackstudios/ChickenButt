@@ -12,10 +12,9 @@ uncommitted profiling instrumentation that must never ship.
 If `desktop-file-validate` / `appstreamcli` are on PATH, runs them against
 the real installed files — desktop-file-validate must succeed cleanly;
 appstreamcli (non-strict `validate`, so only real schema/errors fail — not
-pedantic-only hints) must succeed too. The intentionally-missing
-release/screenshot AppStream data is expected to produce pedantic-only
-warnings, which are reported here as a known, pre-Flathub gap rather than
-silently ignored.
+pedantic-only hints) must succeed too. Releases and screenshots are
+required in metainfo for store packaging; pedantic checks may still warn
+about reverse-DNS uppercase in APP_ID (a known, intentional identity).
 """
 from __future__ import annotations
 
@@ -239,21 +238,58 @@ def main() -> int:
         developer = root.find("developer") if root is not None else None
         results.check("[16] contains a <developer> element", developer is not None)
         urls = {u.get("type"): u.text for u in root.findall("url")} if root is not None else {}
-        results.check("[16] contains homepage url", urls.get("homepage") == "https://github.com/scottonanski/ChickenButt", str(urls))
-        results.check("[16] contains vcs-browser url", "vcs-browser" in urls, str(urls))
-        results.check("[16] contains bugtracker url", "bugtracker" in urls, str(urls))
+        results.check(
+            "[16] contains homepage url",
+            urls.get("homepage") == "https://www.chickenbutt.dev/",
+            str(urls),
+        )
+        results.check(
+            "[16] contains vcs-browser url",
+            urls.get("vcs-browser") == "https://github.com/pixelhackstudios/ChickenButt",
+            str(urls),
+        )
+        results.check(
+            "[16] contains bugtracker url",
+            urls.get("bugtracker") == "https://github.com/pixelhackstudios/ChickenButt/issues",
+            str(urls),
+        )
         results.check(
             "[16] contains OARS content_rating",
             root is not None and root.find("content_rating[@type='oars-1.1']") is not None,
         )
+        screenshots = root.find("screenshots") if root is not None else None
         results.check(
-            "[17] no fabricated <screenshots> element",
-            root is None or root.find("screenshots") is None,
+            "[17] contains a <screenshots> element with at least one screenshot",
+            screenshots is not None and screenshots.find("screenshot") is not None,
         )
+        if screenshots is not None:
+            images = screenshots.findall("screenshot/image")
+            https_images = [
+                el for el in images
+                if (el.text or "").strip().startswith("https://")
+            ]
+            results.check(
+                "[17] screenshot images use https URLs",
+                len(https_images) >= 1,
+                f"https images: {len(https_images)} total images: {len(images)}",
+            )
+        releases = root.find("releases") if root is not None else None
+        release_el = releases.find("release") if releases is not None else None
         results.check(
-            "[17] no fabricated <releases> element",
-            root is None or root.find("releases") is None,
+            "[17] contains a <releases> element with at least one release",
+            release_el is not None,
         )
+        if release_el is not None:
+            results.check(
+                "[17] first release version matches release_info.VERSION",
+                release_el.get("version") == release_info.VERSION,
+                release_el.get("version"),
+            )
+            results.check(
+                "[17] first release has a date attribute",
+                bool(release_el.get("date")),
+                release_el.get("date"),
+            )
 
         if shutil.which("appstreamcli"):
             print("\n[appstreamcli] Real validation against the installed metainfo file", flush=True)
@@ -271,18 +307,15 @@ def main() -> int:
                 capture_output=True, text=True,
             )
             pedantic_out = (pedantic.stdout + pedantic.stderr).strip()
-            known_gaps = ("releases-info-missing", "cid-contains-uppercase-letter")
+            # Uppercase in reverse-DNS app IDs is a long-standing ChickenButt
+            # identity choice (APP_ID); Flathub may still warn pedantically.
+            known_gaps = ("cid-contains-uppercase-letter",)
             unexpected = [
                 line for line in pedantic_out.splitlines()
                 if line.startswith("P:") and not any(gap in line for gap in known_gaps)
             ]
-            print(
-                "  known pre-Flathub pedantic gap (not a failure): "
-                "missing release metadata — add before a Flathub submission.",
-                flush=True,
-            )
             results.check(
-                "no unexpected pedantic AppStream issues beyond the known pre-Flathub gaps",
+                "no unexpected pedantic AppStream issues beyond known APP_ID casing",
                 unexpected == [],
                 "\n".join(unexpected) if unexpected else pedantic_out,
             )

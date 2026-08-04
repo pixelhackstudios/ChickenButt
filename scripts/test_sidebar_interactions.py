@@ -2463,8 +2463,8 @@ class _LoadClient:
             raise self.error
         return self.loaded
 
-    def load_model(self, model: str, *, should_stop):
-        self.calls.append(("load", model))
+    def load_model(self, model: str, *, should_stop, options=None, keep_alive=None, **_kwargs):
+        self.calls.append(("load", model, options, keep_alive))
         self.stop_checks.append(should_stop)
         if self.error is not None:
             raise self.error
@@ -3917,7 +3917,7 @@ class _ScriptedChatStream:
         self.started = threading.Event()
         self.finished = threading.Event()
 
-    def __call__(self, model, messages, *, cancel_event=None):
+    def __call__(self, model, messages, *, cancel_event=None, **_kwargs):
         self.started.set()
         try:
             for index, chunk in enumerate(self.chunks):

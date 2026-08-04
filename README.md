@@ -12,6 +12,9 @@
 
 ChickenButt is a native Linux desktop app for chatting with local AI models through [Ollama](https://ollama.com).
 
+**Website:** [https://www.chickenbutt.dev/](https://www.chickenbutt.dev/)  
+**Source:** [https://github.com/pixelhackstudios/ChickenButt](https://github.com/pixelhackstudios/ChickenButt)
+
 It is built with GTK4 and libadwaita, designed to feel at home on GNOME, and focused on making local AI pleasant to use without turning the interface into an aircraft cockpit.
 
 <p align="center">
@@ -163,6 +166,27 @@ To uninstall from the retained build directory:
 ninja -C build uninstall
 ```
 
+## Install as a Flatpak (development packaging)
+
+ChickenButt can be built as a Flatpak against `org.gnome.Platform` so the same
+app runs on any Flatpak-capable Linux distribution without host GTK packages.
+
+Requirements: `flatpak`, `flatpak-builder`, and a host [Ollama](https://ollama.com)
+service (not bundled). Details, inventory, and sandbox justifications:
+
+* **[packaging/flatpak/README.md](packaging/flatpak/README.md)**
+* **[packaging/flatpak/INVENTORY.md](packaging/flatpak/INVENTORY.md)**
+
+```bash
+# once: flatpak + flatpak-builder + GNOME Platform/SDK 50 from Flathub
+./scripts/build_flatpak.sh
+flatpak run io.github.pixelhackstudios.ChickenButt
+```
+
+This repository holds **development** Flatpak packaging. Publishing to Flathub
+is a separate step that must follow current Flathub policy (including
+human-authored submission materials).
+
 ## Local data
 
 ChickenButt keeps its application data on your machine.
@@ -254,7 +278,9 @@ Please keep changes focused and verify the behavior you touched.
 
 ChickenButt is under active development.
 
-The desktop app is functional and installable from source. The public website is included in this repository. Screenshot/release metadata and Flatpak packaging remain unfinished.
+The desktop app is functional and installable from source (Meson) or as a
+development Flatpak (`packaging/flatpak/`). The public website is included in
+this repository. Flathub publication remains a separate maintainer step.
 
 It is built primarily for GNOME-style Linux desktops, though other GTK-compatible environments may work.
 

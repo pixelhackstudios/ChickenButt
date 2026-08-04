@@ -134,3 +134,15 @@ optional (tray-icon image only) — then run:
 ```bash
 python3 scripts/check_dependencies.py --build
 ```
+
+## Flatpak (alternative to host system packages)
+
+A Flatpak build uses **`org.gnome.Platform//50`** for GTK4, libadwaita,
+WebKitGTK 6, and PyGObject, and bundles **dasbus** inside the app. Host
+distro Python/GTK packages are not required for the Flatpak install path.
+
+See **[packaging/flatpak/README.md](packaging/flatpak/README.md)** and
+**[packaging/flatpak/INVENTORY.md](packaging/flatpak/INVENTORY.md)**.
+
+Ollama remains a **host** service in either install path; it is not part of
+the Flatpak runtime.

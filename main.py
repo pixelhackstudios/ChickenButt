@@ -18,6 +18,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gio, GLib
 
+import app_settings
 from ollama_client import OllamaClient
 from release_info import APP_ID, APP_NAME, VERSION
 from tray import TrayIcon
@@ -38,7 +39,19 @@ class ChickenButtApp(Adw.Application):
 
     def _on_activate(self, *_args) -> None:
         if self.window is None:
-            self.window = ChatSidebar(self, client=OllamaClient())
+            cfg = app_settings.get_ollama_config()
+            self.window = ChatSidebar(
+                self,
+                client=OllamaClient(
+                    base_url=str(
+                        cfg.get("base_url") or app_settings.DEFAULT_BASE_URL
+                    ),
+                    timeout=float(
+                        cfg.get("connect_timeout_sec")
+                        or app_settings.DEFAULT_CONNECT_TIMEOUT_SEC
+                    ),
+                ),
+            )
             self.window.set_close_handler(self._on_window_close)
             self.window.connect("notify::visible", self._on_window_visible)
 

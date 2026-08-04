@@ -11,6 +11,7 @@ gi.require_version("Gtk", "4.0")
 
 from gi.repository import GLib, Gtk
 
+from model_profile import RequestParams
 from ollama_client import OllamaClient, OllamaError
 from ollama_health import HealthKind, HealthState, classify_error
 
@@ -48,6 +49,8 @@ class ModelLoadController:
         save_last_model: Callable[[str], None],
         format_bytes: Callable[[float | int], str],
         on_ready: Callable[[bool], None],
+        get_request_params: Callable[[str], RequestParams] | None = None,
+        note_model_digest: Callable[[str], None] | None = None,
     ) -> None:
         self.client = client
         self._load_overlay = load_overlay
@@ -77,6 +80,8 @@ class ModelLoadController:
         self._save_last_model = save_last_model
         self._format_bytes = format_bytes
         self._on_ready = on_ready
+        self._get_request_params = get_request_params
+        self._note_model_digest = note_model_digest
 
         self._model: str | None = None
         self._loading_model = False
@@ -271,10 +276,18 @@ class ModelLoadController:
                         "Warming weights into memory…",
                         None,
                     )
+                    params = RequestParams()
+                    if self._get_request_params is not None:
+                        try:
+                            params = self._get_request_params(model)
+                        except Exception:  # noqa: BLE001
+                            params = RequestParams()
                     for chunk in self.client.load_model(
                         model,
                         should_stop=lambda: self._stop_load
                         or gen != self._load_generation,
+                        options=params.options,
+                        keep_alive=params.keep_alive,
                     ):
                         if gen != self._load_generation:
                             return
@@ -371,6 +384,11 @@ class ModelLoadController:
             self._health_banner.set_visible(False)
         self._set_status(model)
         self._save_last_model(model)
+        if self._note_model_digest is not None:
+            try:
+                self._note_model_digest(model)
+            except Exception as exc:  # noqa: BLE001
+                print(f"model digest note failed: {exc}", flush=True)
         try:
             cid = self._ensure_conversation()
             self._set_conversation_model(cid, model)

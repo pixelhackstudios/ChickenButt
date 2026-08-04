@@ -94,7 +94,18 @@ class ScriptedStream:
         self.stopped_early = False
         self.called_model: str | None = None
 
-    def __call__(self, model, messages, *, cancel_event=None):
+    def __call__(
+        self,
+        model,
+        messages,
+        *,
+        cancel_event=None,
+        options=None,
+        keep_alive=None,
+        think=None,
+        on_done=None,
+        **_kwargs,
+    ):
         self.called_model = model
         self.started.set()
         for i, chunk in enumerate(self.chunks):
@@ -106,6 +117,12 @@ class ScriptedStream:
                 self.finished.set()
                 return
             yield chunk
+        # Mimic a final done event only when the stream was not cancelled.
+        if on_done is not None and not self.stopped_early:
+            try:
+                on_done({"done": True, "eval_count": 0})
+            except Exception:  # noqa: BLE001
+                pass
         self.finished.set()
 
     def release(self) -> None:

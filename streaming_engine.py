@@ -14,6 +14,7 @@ from gi.repository import GLib, Gtk
 from conversation_lifecycle import ConversationLifecycleController
 from conversation_store import ConversationStore
 from message_actions import MessageActionController
+from model_profile import RequestParams
 from ollama_client import OllamaClient, OllamaError
 from ollama_health import HealthState, classify_error
 from transcript_adapter import TranscriptAdapter
@@ -65,6 +66,8 @@ class StreamingEngineController:
         input_widget: Gtk.TextView | None,
         send_control: Gtk.Button | None,
         stop_control: Gtk.Button | None,
+        get_request_params: Callable[[str], RequestParams] | None = None,
+        on_generation_done: Callable[[str, dict], None] | None = None,
     ) -> None:
         self.client = client
         self._get_store = get_store
@@ -83,6 +86,8 @@ class StreamingEngineController:
         self.input = input_widget
         self.send_btn = send_control
         self.stop_btn = stop_control
+        self._get_request_params = get_request_params
+        self._on_generation_done = on_generation_done
 
         self._streaming = False
         self._stream_generation = 0
@@ -287,10 +292,29 @@ class StreamingEngineController:
 
         def work():
             try:
+                params = RequestParams()
+                if self._get_request_params is not None and origin_model:
+                    try:
+                        params = self._get_request_params(origin_model)
+                    except Exception:  # noqa: BLE001
+                        params = RequestParams()
+
+                def _on_done(chunk: dict) -> None:
+                    if self._on_generation_done is None or not origin_model:
+                        return
+                    try:
+                        self._on_generation_done(origin_model, chunk)
+                    except Exception:  # noqa: BLE001
+                        pass
+
                 for piece in self.client.chat_stream(
                     origin_model,
                     list(outbound),
                     cancel_event=cancel_event,
+                    options=params.options,
+                    keep_alive=params.keep_alive,
+                    think=params.think,
+                    on_done=_on_done if self._on_generation_done is not None else None,
                 ):
                     collected.append(piece)
                     with state["lock"]:

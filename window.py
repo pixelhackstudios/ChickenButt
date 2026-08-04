@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from conversation_store import ConversationStore
 from health_probe import HealthProbeController
 from message_actions import MessageActionController
 from message_widgets import ensure_md_css
+from model_profile import ModelProfileService
 from model_session import ModelLoadController
 from ollama_client import OllamaClient
 from ollama_health import HealthState
@@ -437,7 +439,21 @@ def _is_ephemeral_greeting(role: str, content: str) -> bool:
 class ChatSidebar(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, client: OllamaClient | None = None):
         super().__init__(application=app, title="ChickenButt")
-        self.client = client or OllamaClient()
+        self._model_profiles = ModelProfileService(
+            settings_dir=_SETTINGS_DIR,
+            settings_path=_SETTINGS_PATH,
+        )
+        if client is not None:
+            self.client = client
+        else:
+            ollama_cfg = _app_settings.get_ollama_config(_SETTINGS_PATH)
+            self.client = OllamaClient(
+                base_url=str(ollama_cfg.get("base_url") or _app_settings.DEFAULT_BASE_URL),
+                timeout=float(
+                    ollama_cfg.get("connect_timeout_sec")
+                    or _app_settings.DEFAULT_CONNECT_TIMEOUT_SEC
+                ),
+            )
         self._store = ConversationStore()
         self._conversation: ConversationLifecycleController | None = None
         self._conversation_exporter = ConversationExporter(
@@ -527,6 +543,8 @@ class ChatSidebar(Adw.ApplicationWindow):
             on_ready=lambda should_greet: (
                 self._show_ephemeral_greeting() if should_greet else None
             ),
+            get_request_params=self._model_profiles.request_params,
+            note_model_digest=self._note_model_digest,
         )
         self._health_probe = HealthProbeController(
             client=self.client,
@@ -656,6 +674,8 @@ class ChatSidebar(Adw.ApplicationWindow):
             input_widget=self.input,
             send_control=self.send_btn,
             stop_control=self.stop_btn,
+            get_request_params=self._model_profiles.request_params,
+            on_generation_done=self._on_generation_done,
         )
         self._conversation.rebind_request_stop(self._streaming_engine.request_stop)
         self._conversation.rebind_invalidate_active_stream(
@@ -1025,6 +1045,52 @@ class ChatSidebar(Adw.ApplicationWindow):
     def toggle_sidebar(self, show: bool | None = None) -> None:
         """Intentional public window entrypoint; delegates to the sidebar owner."""
         self._sidebar_history.toggle_sidebar(show)
+
+    def _note_model_digest(self, model: str) -> None:
+        """Resolve digest for *model* and apply name/digest profile policy.
+
+        Best-effort background work: offline or show failures leave
+        preferences untouched. Does not block the UI thread on HTTP.
+        """
+        if not model or not model.strip():
+            return
+
+        def work() -> None:
+            digest: str | None = None
+            try:
+                for desc in self.client.list_models_detail():
+                    if desc.name == model and desc.digest:
+                        digest = desc.digest
+                        break
+                if digest is None:
+                    shown = self.client.show_model(model)
+                    digest = shown.digest
+            except Exception:  # noqa: BLE001
+                digest = None
+            if digest:
+                try:
+                    self._model_profiles.ensure_digest(model, digest)
+                except Exception as exc:  # noqa: BLE001
+                    print(f"model digest note failed: {exc}", flush=True)
+
+        threading.Thread(target=work, daemon=True, name="cb-model-digest").start()
+
+    def _on_generation_done(self, model: str, chunk: dict) -> None:
+        """Persist final stream metrics under the model profile observations."""
+        if not model:
+            return
+        digest = None
+        try:
+            profile = self._model_profiles.get_profile(model)
+            dig = profile.get("last_seen_digest")
+            if isinstance(dig, str):
+                digest = dig
+        except Exception:  # noqa: BLE001
+            digest = None
+        try:
+            self._model_profiles.record_metrics(model, chunk, digest=digest)
+        except Exception as exc:  # noqa: BLE001
+            print(f"record metrics failed: {exc}", flush=True)
 
     def open_settings(self) -> None:
         """Minimal settings shell — room for future prefs without scope creep."""

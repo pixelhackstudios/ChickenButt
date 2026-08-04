@@ -301,7 +301,7 @@ def main() -> int:
     half = len(MALICIOUS_MD) // 2
     chunks = [MALICIOUS_MD[:half], MALICIOUS_MD[half:]]
 
-    def fake_chat_stream(model, messages, *, cancel_event=None):
+    def fake_chat_stream(model, messages, *, cancel_event=None, **_kwargs):
         for c in chunks:
             yield c
 

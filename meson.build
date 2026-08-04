@@ -13,8 +13,8 @@ project('chickenbutt', meson_version: '>=0.64.0')
 # AppStream metainfo and hicolor icon that let an installed ChickenButt
 # show up in the desktop application grid.
 #
-# Flatpak packaging, screenshot/release AppStream data and CI remain
-# separate follow-up work.
+# Flatpak packaging lives under packaging/flatpak/ (development manifest +
+# inventory). Flathub submission is a separate, human-maintainer step.
 
 python3 = find_program('python3')
 
@@ -31,24 +31,26 @@ release_identity = run_command(
   'sys.path.insert(0, ".")\n' +
   'import release_info\n' +
   'print(release_info.APP_ID)\n' +
-  'print(release_info.APP_NAME)\n',
+  'print(release_info.APP_NAME)\n' +
+  'print(release_info.VERSION)\n',
   check: false,
 )
 if release_identity.returncode() != 0
   error(
-    'meson.build: could not read APP_ID/APP_NAME from release_info.py: '
+    'meson.build: could not read APP_ID/APP_NAME/VERSION from release_info.py: '
     + release_identity.stderr()
   )
 endif
 identity_lines = release_identity.stdout().strip().split('\n')
-if identity_lines.length() != 2 or identity_lines[0] == '' or identity_lines[1] == ''
+if identity_lines.length() != 3 or identity_lines[0] == '' or identity_lines[1] == '' or identity_lines[2] == ''
   error(
-    'meson.build: release_info.py did not produce both APP_ID and APP_NAME — got: '
+    'meson.build: release_info.py did not produce APP_ID, APP_NAME, and VERSION — got: '
     + release_identity.stdout()
   )
 endif
 app_id = identity_lines[0]
 app_name = identity_lines[1]
+app_version = identity_lines[2]
 
 # Explicit allowlist — do not glob *.py. In particular this keeps the
 # untracked, dev-only profiling.py (and anything else not listed here) out
@@ -64,6 +66,7 @@ runtime_python_sources = files(
   'health_probe.py',
   'message_actions.py',
   'message_widgets.py',
+  'model_profile.py',
   'model_session.py',
   'ollama_client.py',
   'ollama_health.py',
@@ -133,9 +136,10 @@ configure_file(
 identity_conf = configuration_data()
 identity_conf.set('APP_ID', app_id)
 identity_conf.set('APP_NAME', app_name)
+identity_conf.set('VERSION', app_version)
 
 configure_file(
-  input: 'data/io.github.scottonanski.ChickenButt.desktop.in',
+  input: 'data/io.github.pixelhackstudios.ChickenButt.desktop.in',
   output: '@0@.desktop'.format(app_id),
   configuration: identity_conf,
   install: true,
@@ -143,7 +147,7 @@ configure_file(
 )
 
 configure_file(
-  input: 'data/io.github.scottonanski.ChickenButt.metainfo.xml.in',
+  input: 'data/io.github.pixelhackstudios.ChickenButt.metainfo.xml.in',
   output: '@0@.metainfo.xml'.format(app_id),
   configuration: identity_conf,
   install: true,

@@ -9,6 +9,6 @@ activation.
 
 from __future__ import annotations
 
-APP_ID = "io.github.scottonanski.ChickenButt"
+APP_ID = "io.github.pixelhackstudios.ChickenButt"
 APP_NAME = "ChickenButt"
 VERSION = "0.1.0"

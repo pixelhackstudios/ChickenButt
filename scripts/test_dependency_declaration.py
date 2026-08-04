@@ -258,9 +258,13 @@ def main() -> int:
         readme_text,
     )
     results.check(
-        "[14] README says screenshot/release metadata and Flatpak packaging remain unfinished",
-        "remain unfinished" in readme_text,
-        readme_text,
+        "[14] README documents development Flatpak packaging (Flathub separate)",
+        "Install as a Flatpak" in readme_text
+        and "development" in readme_text.lower()
+        and "Flathub" in readme_text,
+        readme_text[readme_text.find("Flatpak") : readme_text.find("Flatpak") + 400]
+        if "Flatpak" in readme_text
+        else readme_text[:400],
     )
     results.check("[15] vendored-code notice includes DOMPurify", "DOMPurify" in readme_text)
 

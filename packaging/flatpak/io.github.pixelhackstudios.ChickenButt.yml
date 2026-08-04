@@ -1,0 +1,52 @@
+# Development Flatpak manifest for ChickenButt.
+#
+# Runtime and dependency rationale: packaging/flatpak/INVENTORY.md
+#
+# Development source: local dir (this checkout). For a release / Flathub
+# candidate, replace the chickenbutt module sources with a pinned git tag+commit
+# or archive+sha256 (no floating branches). Flathub submission materials must
+# be human-authored under current Flathub policy — see packaging/flatpak/README.md.
+
+id: io.github.pixelhackstudios.ChickenButt
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: chickenbutt
+
+finish-args:
+  # Display / GPU
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Host Ollama HTTP API (default http://127.0.0.1:11434)
+  - --share=network
+  # Portals + StatusNotifierItem tray (dasbus)
+  - --socket=session-bus
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --own-name=org.kde.StatusNotifierItem.*
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+  - /share/doc
+  - "*.a"
+  - "*.la"
+
+modules:
+  - python3-dasbus.json
+
+  - name: chickenbutt
+    buildsystem: meson
+    config-opts:
+      # flatpak-builder's meson module already sets --prefix=/app and --libdir=lib
+      - --buildtype=release
+    sources:
+      # Development: full local tree (includes uncommitted packaging edits).
+      # Prefer ./scripts/build_flatpak.sh which stages a filtered copy so
+      # chickenbutt-web/node_modules is not sucked into the build. For
+      # Flathub/release, replace with remote url + tag + full commit (or
+      # archive + sha256) — no floating branches.
+      - type: dir
+        path: ../..
