@@ -134,7 +134,7 @@ The root repository also contains an `AGENTS.md` file covering rules shared acro
 * [ChickenButt repository](https://github.com/pixelhackstudios/ChickenButt)
 * [Website source](https://github.com/pixelhackstudios/ChickenButt/tree/main/chickenbutt-web)
 * [Pixel Hack Studios](https://www.pixelhackstudios.com)
-* [Scott O'Nanski on GitHub](https://github.com/scottonanski)
+* [PixelHack Studios on GitHub](https://github.com/pixelhackstudios)
 * Contact: `whatsup@chickenbutt.dev`
 
 ## License

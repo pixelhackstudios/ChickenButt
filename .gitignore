@@ -5,6 +5,11 @@ __pycache__/
 .venv/
 venv/
 
+# Flatpak local build artifacts
+build-dir/
+.flatpak-builder/
+.flatpak-stage/
+
 # App runtime data (created next to the repo, but ignore just in case)
 *.db
 *.sqlite3
