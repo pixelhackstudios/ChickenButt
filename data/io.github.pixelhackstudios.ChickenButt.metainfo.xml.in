@@ -48,9 +48,9 @@
   </screenshots>
 
   <releases>
-    <release version="@VERSION@" date="2026-07-26">
+    <release version="@VERSION@" date="2026-08-05">
       <description>
-        <p>Initial public packaging release: native GTK4 client for local Ollama chat.</p>
+        <p>Version 0.1.1: Flatpak packaging with settings (connection, per-model controls, Model Fit) and aligned release metadata.</p>
       </description>
     </release>
   </releases>

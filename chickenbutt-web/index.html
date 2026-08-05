@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- PNG first: Chromium often fails to paint complex Inkscape SVGs as tab icons (local + prod). -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=3" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChickenButt - Local AI Chat for Linux</title>
     <meta name="description" content="A native Linux desktop client for chatting with local Ollama models. Fast, straightforward, and private." />
