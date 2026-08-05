@@ -120,8 +120,11 @@ export default function Install() {
             </div>
           </InstallerPanel>
 
-          {/* Step 3: Get ChickenButt */}
-          <InstallerPanel num="03" title="Get ChickenButt" path="~">
+          {/* Step 3: Get ChickenButt (source / dev) */}
+          <InstallerPanel num="03" title="Or run from source" path="~/ChickenButt">
+            <div className="term-line break-all sm:break-normal text-(--ink-300) mb-1">
+              Prefer Flatpak above for everyday use. Source is for hacking on ChickenButt.
+            </div>
             <div className="term-line break-all sm:break-normal">
               <span className="term-prompt">$ </span>
               git clone https://github.com/pixelhackstudios/ChickenButt.git
@@ -186,25 +189,40 @@ export default function Install() {
         <div className="card p-5 sm:p-7 flex flex-col bg-linear-to-br from-(--panel) to-(--bg)">
           <span className="badge mb-4 self-start">
             <span className="dot-green"></span>
-            Pending
+            Live
           </span>
           <h3 className="font-display text-lg sm:text-xl tracking-tight mb-3">
-            <span className="text-[#4FAE2A]">Flatpak is coming soon!</span>
+            <span className="text-[#4FAE2A]">Flatpak is NOW LIVE!</span>
           </h3>
-          <p className="text-[13px] sm:text-[14px] text-(--ink-200) leading-relaxed mb-6 grow">
-            I'm just one guy working on this, so be patient with me. It'll land on Flathub when
-            it's ready and not before. This is a labor of love, after all.
+          <p className="text-[13px] sm:text-[14px] text-(--ink-200) leading-relaxed mb-5 grow">
+            Grab the Linux Flatpak from GitHub Releases—one file, no source build. Install it
+            with Flatpak on your system, keep Ollama running on the host, and ChickenButt will
+            talk to it over the network. Flathub can wait; this is the supported download today.
           </p>
 
-          <div className="mt-auto">
+          <div className="rounded-xl border border-border bg-(--ink-950) p-4 font-mono text-[12px] sm:text-[13px] leading-relaxed sm:leading-loose text-(--ink-100) mb-5 overflow-x-auto">
+            <div className="term-line break-all sm:break-normal">
+              <span className="term-prompt">$ </span>
+              flatpak install --user ChickenButt-*-x86_64.flatpak
+            </div>
+            <div className="term-line break-all sm:break-normal">
+              <span className="term-prompt">$ </span>
+              flatpak run io.github.pixelhackstudios.ChickenButt
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-auto">
+            <p className="text-[12px] text-(--ink-400) max-w-55 leading-snug">
+              Linux · x86_64 · requires Ollama on the host
+            </p>
             <a
-              href="https://github.com/pixelhackstudios/ChickenButt"
+              href="https://github.com/pixelhackstudios/ChickenButt/releases/latest"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-outline-solid px-5 py-3 text-[14px] focus-ring w-full group flex items-center justify-center gap-2"
+              className="btn-outline-solid px-5 py-3 text-[14px] focus-ring w-full sm:w-auto group flex items-center justify-center gap-2 shrink-0"
             >
-              Watch the repo
-              <span className="opacity-60 group-hover:opacity-100 transition-opacity">⭐</span>
+              Download Flatpak
+              <span className="opacity-60 group-hover:opacity-100 transition-opacity">↓</span>
             </a>
           </div>
         </div>

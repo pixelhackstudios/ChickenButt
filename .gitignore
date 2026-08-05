@@ -9,6 +9,9 @@ venv/
 build-dir/
 .flatpak-builder/
 .flatpak-stage/
+flatpak-repo/
+dist-flatpak/
+*.flatpak
 
 # App runtime data (created next to the repo, but ignore just in case)
 *.db
