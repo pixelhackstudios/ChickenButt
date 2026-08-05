@@ -63,6 +63,7 @@ REQUIRED_PY_MODULES = [
     "health_probe.py",
     "message_actions.py",
     "message_widgets.py",
+    "model_fit.py",
     "model_profile.py",
     "model_session.py",
     "ollama_client.py",
@@ -289,8 +290,8 @@ def main() -> int:
                     "import release_info, app_settings, composer_cli, composer_geometry, "
                     "connection_settings, conversation_export, conversation_lifecycle, "
                     "conversation_store, health_probe, message_actions, message_widgets, "
-                    "model_profile, model_session, ollama_client, sidebar_history, "
-                    "transcript_view, window_view; "
+                    "model_fit, model_profile, model_session, ollama_client, "
+                    "sidebar_history, transcript_view, window_view; "
                     "print('OK'); "
                     "print(str(transcript_view.WEB_DIR)); "
                     "print((transcript_view.WEB_DIR / 'index.html').is_file())",
@@ -304,7 +305,7 @@ def main() -> int:
                 "[7] release_info/app_settings/composer_cli/composer_geometry/"
                 "connection_settings/conversation_export/conversation_lifecycle/"
                 "conversation_store/health_probe/message_actions/message_widgets/"
-                "model_profile/model_session/ollama_client/sidebar_history/"
+                "model_fit/model_profile/model_session/ollama_client/sidebar_history/"
                 "transcript_view/window_view all import",
                 import_check.returncode == 0 and out_lines[:1] == ["OK"],
                 import_check.stderr[-500:],

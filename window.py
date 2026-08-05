@@ -1093,6 +1093,12 @@ class ChatSidebar(Adw.ApplicationWindow):
             self._model_profiles.record_metrics(model, chunk, digest=digest)
         except Exception as exc:  # noqa: BLE001
             print(f"record metrics failed: {exc}", flush=True)
+        # Refresh open Model Fit so last-response rates update (observational).
+        if self._connection_prefs is not None:
+            try:
+                self._connection_prefs.refresh_selected_model()
+            except Exception:  # noqa: BLE001
+                pass
 
     def open_settings(self) -> None:
         """Settings: connection (Phase 1) + per-model basics (Phase 2)."""
@@ -1105,6 +1111,11 @@ class ChatSidebar(Adw.ApplicationWindow):
                     self._model_session.current_model
                     if self._model_session is not None
                     else None
+                ),
+                get_conversation_messages=lambda: (
+                    list(self._conversation.messages)
+                    if self._conversation is not None
+                    else []
                 ),
                 settings_dir=_SETTINGS_DIR,
                 settings_path=_SETTINGS_PATH,

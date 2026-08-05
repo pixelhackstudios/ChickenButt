@@ -1,7 +1,7 @@
-"""Adwaita preferences: connection (Phase 1) + per-model basics (Phase 2).
+"""Adwaita preferences: connection, per-model basics, passive Model Fit.
 
-Phase 2 covers context tier, response style, max output, keep-alive, and
-capability-gated thinking. No Model Fit, advanced sampling, or calibration.
+Phase 3 Model Fit is observational only (show/ps/metrics). It never changes
+Phase 2 controls, request options, or loads models.
 
 Controllers share the same ``OllamaClient`` instance; connection changes
 update that instance in place so load/chat keep working without rewiring.
@@ -12,6 +12,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import gi
 
@@ -22,6 +23,20 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Adw, Gio, GLib, Gtk
 
 import app_settings as _app_settings
+from model_fit import (
+    UNAVAILABLE,
+    capabilities_label,
+    context_budget,
+    context_usage_view,
+    estimate_conversation_tokens,
+    format_bytes,
+    format_tokens,
+    format_tps,
+    gpu_resident_portion,
+    last_metrics_if_current,
+    match_running_model,
+    merge_descriptor,
+)
 from model_profile import (
     CONTEXT_TIER_IDS,
     CONTEXT_TIER_LABELS,
@@ -34,8 +49,9 @@ from model_profile import (
     RESPONSE_STYLE_TEMPERATURE,
     ModelProfileService,
     keep_alive_id_for_value,
+    num_ctx_for_tier,
 )
-from ollama_client import OllamaClient, OllamaError
+from ollama_client import ModelDescriptor, OllamaClient, OllamaError
 
 
 def open_folder(path: Path, *, parent: Gtk.Window | None = None) -> None:
@@ -82,6 +98,7 @@ class ConnectionPreferences:
         client: OllamaClient,
         profiles: ModelProfileService,
         get_selected_model: Callable[[], str | None],
+        get_conversation_messages: Callable[[], list[dict[str, Any]]] | None = None,
         settings_dir: Path | None = None,
         settings_path: Path | None = None,
         on_connection_applied: Callable[[], None] | None = None,
@@ -90,6 +107,7 @@ class ConnectionPreferences:
         self._client = client
         self._profiles = profiles
         self._get_selected_model = get_selected_model
+        self._get_conversation_messages = get_conversation_messages
         self._settings_dir = settings_dir
         self._settings_path = settings_path
         self._on_connection_applied = on_connection_applied
@@ -110,10 +128,14 @@ class ConnectionPreferences:
         self._think_row: Adw.SwitchRow | None = None
         self._reset_btn: Gtk.Button | None = None
         self._model_group: Adw.PreferencesGroup | None = None
+        # Model Fit rows (Phase 3) — ActionRow title → widget
+        self._fit_rows: dict[str, Adw.ActionRow] = {}
+        self._fit_warning_row: Adw.ActionRow | None = None
         self._applying = False
         self._model_loading = False
         self._test_generation = 0
         self._caps_generation = 0
+        self._fit_generation = 0
         self._think_supported = False
         self._bound_model: str | None = None
 
@@ -138,6 +160,7 @@ class ConnectionPreferences:
             return
         self._load_model_prefs()
         self._probe_thinking_capability()
+        self._refresh_model_fit_async()
 
     def _build(self) -> Adw.PreferencesDialog:
         dialog = Adw.PreferencesDialog()
@@ -332,6 +355,72 @@ class ConnectionPreferences:
         reset_row.set_activatable_widget(reset_btn)
         model_group.add(reset_row)
         self._reset_btn = reset_btn
+
+        # --- Model Fit (Phase 3, observational only) ---
+        fit_page = Adw.PreferencesPage()
+        fit_page.set_title("Model Fit")
+        fit_page.set_icon_name("emblem-ok-symbolic")
+        dialog.add(fit_page)
+
+        fit_intro = Adw.PreferencesGroup()
+        fit_intro.set_title("Model Fit")
+        fit_intro.set_description(
+            "Observational facts about the selected model. This page never "
+            "changes your Model preferences or chat options."
+        )
+        fit_page.add(fit_intro)
+
+        def _fit_row(group: Adw.PreferencesGroup, key: str, title: str) -> Adw.ActionRow:
+            row = Adw.ActionRow()
+            row.set_title(title)
+            row.set_subtitle(UNAVAILABLE)
+            group.add(row)
+            self._fit_rows[key] = row
+            return row
+
+        model_facts = Adw.PreferencesGroup()
+        model_facts.set_title("Model")
+        fit_page.add(model_facts)
+        _fit_row(model_facts, "parameters", "Parameters")
+        _fit_row(model_facts, "quantization", "Quantization")
+        _fit_row(model_facts, "max_context", "Maximum supported context")
+        _fit_row(model_facts, "capabilities", "Capabilities")
+        _fit_row(model_facts, "model_size", "Model size")
+
+        load_facts = Adw.PreferencesGroup()
+        load_facts.set_title("Current load")
+        load_facts.set_description(
+            "Appears when this model is loaded in Ollama. "
+            "GPU-resident portion is the share of this model’s memory in GPU "
+            "memory — not overall GPU utilization."
+        )
+        fit_page.add(load_facts)
+        _fit_row(load_facts, "allocated_ctx", "Allocated context")
+        _fit_row(load_facts, "loaded_mem", "Loaded memory")
+        _fit_row(load_facts, "vram_mem", "GPU-resident memory")
+        _fit_row(load_facts, "gpu_portion", "GPU-resident portion")
+
+        last_resp = Adw.PreferencesGroup()
+        last_resp.set_title("Last response")
+        last_resp.set_description(
+            "From the last completed generation for this model’s current "
+            "installed digest. Empty after a digest change until you chat again."
+        )
+        fit_page.add(last_resp)
+        _fit_row(last_resp, "prompt_tps", "Prompt processing")
+        _fit_row(last_resp, "gen_tps", "Generation speed")
+        _fit_row(last_resp, "peak_ctx", "Peak context used")
+
+        convo = Adw.PreferencesGroup()
+        convo.set_title("Conversation")
+        fit_page.add(convo)
+        _fit_row(convo, "ctx_usage", "Context usage")
+        warn = Adw.ActionRow()
+        warn.set_title("Context warning")
+        warn.set_subtitle("")
+        warn.set_visible(False)
+        convo.add(warn)
+        self._fit_warning_row = warn
 
         dialog.connect("closed", self._on_closed)
         return dialog
@@ -551,6 +640,235 @@ class ConnectionPreferences:
         threading.Thread(
             target=work, daemon=True, name="cb-settings-think-caps"
         ).start()
+
+    def _fit_set(self, key: str, subtitle: str) -> None:
+        row = self._fit_rows.get(key)
+        if row is not None:
+            row.set_subtitle(subtitle)
+
+    def _fit_clear_all(self) -> None:
+        for key in self._fit_rows:
+            self._fit_set(key, UNAVAILABLE)
+        if self._fit_warning_row is not None:
+            self._fit_warning_row.set_visible(False)
+            self._fit_warning_row.set_subtitle("")
+
+    def _profile_num_ctx(self, model: str | None) -> int | None:
+        if not model:
+            return None
+        profile = self._profiles.get_profile(model)
+        tier = profile.get("context_tier")
+        options = profile.get("options") if isinstance(profile.get("options"), dict) else {}
+        return num_ctx_for_tier(
+            str(tier) if isinstance(tier, str) else None,
+            options if isinstance(options, dict) else None,
+        )
+
+    def _refresh_model_fit_async(self) -> None:
+        """Fetch show/ps on a worker; apply only if generation still matches."""
+        model = self._selected_model_name()
+        self._fit_generation += 1
+        gen = self._fit_generation
+        self._fit_clear_all()
+        if not model:
+            return
+
+        # Immediate conversation estimate (local, no network).
+        self._apply_conversation_usage(
+            model=model,
+            allocated_ctx=None,
+            max_ctx=None,
+            measured_peak=None,
+        )
+
+        def work() -> None:
+            show_desc: ModelDescriptor | None = None
+            tags_desc: ModelDescriptor | None = None
+            running = None
+            show_error: str | None = None
+            try:
+                show_desc = self._client.show_model(model)
+            except Exception as exc:  # noqa: BLE001
+                show_error = str(exc) or "show failed"
+            try:
+                for d in self._client.list_models_detail():
+                    if d.name == model:
+                        tags_desc = d
+                        break
+                    if d.name.split(":")[0] == model.split(":")[0] and tags_desc is None:
+                        tags_desc = d
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                running = match_running_model(
+                    model, self._client.list_running_models_detail()
+                )
+            except Exception:  # noqa: BLE001
+                running = None
+
+            merged = merge_descriptor(show_desc, tags_desc)
+            profile = self._profiles.get_profile(model)
+            dig = None
+            if running is not None and running.digest:
+                dig = running.digest
+            elif merged is not None and merged.digest:
+                dig = merged.digest
+            elif isinstance(profile.get("last_seen_digest"), str):
+                dig = profile["last_seen_digest"]
+            metrics = last_metrics_if_current(profile, current_digest=dig)
+
+            def done() -> bool:
+                if gen != self._fit_generation:
+                    return False
+                if self._selected_model_name() != model:
+                    return False
+                self._apply_model_fit_snapshot(
+                    model=model,
+                    merged=merged,
+                    running=running,
+                    metrics=metrics,
+                    show_error=show_error,
+                )
+                return False
+
+            GLib.idle_add(done)
+
+        threading.Thread(
+            target=work, daemon=True, name="cb-settings-model-fit"
+        ).start()
+
+    def _apply_model_fit_snapshot(
+        self,
+        *,
+        model: str,
+        merged: ModelDescriptor | None,
+        running: Any,
+        metrics: dict[str, Any] | None,
+        show_error: str | None,
+    ) -> None:
+        if merged is not None:
+            self._fit_set(
+                "parameters",
+                merged.parameter_size or UNAVAILABLE,
+            )
+            self._fit_set(
+                "quantization",
+                merged.quantization or UNAVAILABLE,
+            )
+            self._fit_set(
+                "max_context",
+                format_tokens(merged.context_length),
+            )
+            self._fit_set(
+                "capabilities",
+                capabilities_label(merged.capabilities),
+            )
+            self._fit_set("model_size", format_bytes(merged.size))
+        elif show_error:
+            # Network/metadata failure: unavailable, do not break chat.
+            self._fit_set("parameters", UNAVAILABLE)
+            self._fit_set("quantization", UNAVAILABLE)
+            self._fit_set("max_context", UNAVAILABLE)
+            self._fit_set("capabilities", UNAVAILABLE)
+            self._fit_set("model_size", UNAVAILABLE)
+
+        if running is not None:
+            self._fit_set(
+                "allocated_ctx",
+                format_tokens(running.context_length),
+            )
+            self._fit_set("loaded_mem", format_bytes(running.size))
+            self._fit_set("vram_mem", format_bytes(running.size_vram))
+            self._fit_set(
+                "gpu_portion",
+                gpu_resident_portion(running.size, running.size_vram),
+            )
+        else:
+            self._fit_set("allocated_ctx", "Not loaded")
+            self._fit_set("loaded_mem", "Not loaded")
+            self._fit_set("vram_mem", "Not loaded")
+            self._fit_set("gpu_portion", "Not loaded")
+
+        if metrics:
+            self._fit_set(
+                "prompt_tps",
+                format_tps(metrics.get("prompt_tokens_per_sec")),
+            )
+            self._fit_set(
+                "gen_tps",
+                format_tps(metrics.get("generation_tokens_per_sec")),
+            )
+            self._fit_set(
+                "peak_ctx",
+                format_tokens(metrics.get("peak_context_tokens")),
+            )
+            measured_peak = metrics.get("peak_context_tokens")
+            if not isinstance(measured_peak, (int, float)):
+                measured_peak = None
+            else:
+                measured_peak = int(measured_peak)
+        else:
+            self._fit_set("prompt_tps", UNAVAILABLE)
+            self._fit_set("gen_tps", UNAVAILABLE)
+            self._fit_set("peak_ctx", UNAVAILABLE)
+            measured_peak = None
+
+        max_ctx = merged.context_length if merged is not None else None
+        allocated = running.context_length if running is not None else None
+        self._apply_conversation_usage(
+            model=model,
+            allocated_ctx=allocated,
+            max_ctx=max_ctx,
+            measured_peak=measured_peak,
+        )
+
+    def _apply_conversation_usage(
+        self,
+        *,
+        model: str,
+        allocated_ctx: int | None,
+        max_ctx: int | None,
+        measured_peak: int | None,
+    ) -> None:
+        budget = context_budget(
+            allocated_ctx=allocated_ctx,
+            max_ctx=max_ctx,
+            profile_num_ctx=self._profile_num_ctx(model),
+        )
+        # Prefer Ollama-measured peak from last response when available;
+        # otherwise estimate from the open conversation (labelled estimated).
+        estimated = True
+        used: int | None
+        if measured_peak is not None and measured_peak > 0:
+            used = measured_peak
+            estimated = False
+        else:
+            messages: list[dict[str, Any]] = []
+            if self._get_conversation_messages is not None:
+                try:
+                    messages = list(self._get_conversation_messages() or [])
+                except Exception:  # noqa: BLE001
+                    messages = []
+            used = estimate_conversation_tokens(messages) if messages else 0
+            estimated = True
+
+        view = context_usage_view(
+            used_tokens=used if budget else used,
+            budget=budget,
+            estimated=estimated,
+        )
+        self._fit_set("ctx_usage", view.label)
+        if self._fit_warning_row is not None:
+            if view.warn:
+                self._fit_warning_row.set_visible(True)
+                self._fit_warning_row.set_subtitle(
+                    "This conversation is approaching the context limit. "
+                    "Older messages may soon be removed or summarized by the "
+                    "model runtime — ChickenButt does not truncate chat here."
+                )
+            else:
+                self._fit_warning_row.set_visible(False)
+                self._fit_warning_row.set_subtitle("")
 
     def _save_model_prefs(self) -> None:
         if self._model_loading:

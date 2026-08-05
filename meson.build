@@ -67,6 +67,7 @@ runtime_python_sources = files(
   'health_probe.py',
   'message_actions.py',
   'message_widgets.py',
+  'model_fit.py',
   'model_profile.py',
   'model_session.py',
   'ollama_client.py',
