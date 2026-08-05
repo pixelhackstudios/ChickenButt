@@ -30,6 +30,8 @@ body.theme-light {
   --bg: #f4f4f6;
   --fg: #1c1c1e;
   --muted: rgba(0, 0, 0, 0.5);
+  --bubble-user: #e4e4ea;
+  --bubble-user-fg: #1c1c1e;
   --bubble-assistant: rgba(0, 0, 0, 0.06);
   --code-bg: #eef0f4;
   --code-header: #e2e5eb;

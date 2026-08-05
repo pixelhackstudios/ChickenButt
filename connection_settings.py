@@ -65,14 +65,15 @@ def _ensure_preferences_css() -> None:
     provider = Gtk.CssProvider()
     provider.load_from_string(
         """
-        /* Full-column settings page (Connection · Model · Model Fit) */
+        /* Full-column settings page (Connection · Model · Model Fit).
+           Background follows Adwaita so light/dark stay coherent. */
         .chickenbutt-settings-panel {
-            background-color: #121216;
+            background-color: @window_bg_color;
         }
         .chickenbutt-settings-panel headerbar {
             padding-top: 10px;
             padding-bottom: 8px;
-            background-color: #121216;
+            background-color: @window_bg_color;
         }
         .chickenbutt-settings-panel adw-view-switcher {
             margin-top: 2px;

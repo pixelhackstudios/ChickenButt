@@ -106,14 +106,14 @@ MD_CSS = b"""
 }
 .code-block {
     border-radius: 10px;
-    /* Opaque so the solid chat surface doesn't show through */
-    background-color: #1a1b22;
+    /* Theme-aware fill so light mode is not stuck on dark code chrome */
+    background-color: alpha(@window_fg_color, 0.06);
     border: 1px solid alpha(@window_fg_color, 0.12);
     margin: 8px 0 6px 0;
 }
 .code-block-header {
     padding: 6px 10px;
-    background-color: #22232c;
+    background-color: alpha(@window_fg_color, 0.08);
     border-bottom: 1px solid alpha(@window_fg_color, 0.10);
 }
 .code-lang {

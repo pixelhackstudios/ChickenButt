@@ -96,9 +96,10 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
 
 
 APP_CSS = b"""
-/* ---- chat surface (solid, matches WebKit --bg) ---- */
+/* ---- chat surface (solid; tracks Adwaita light/dark) ---- */
+/* Prefer @window_bg_color so light is never stuck on the dark Grok tint. */
 .chat-surface {
-    background-color: #121216;
+    background-color: @window_bg_color;
 }
 .chat-list {
     background: transparent;
@@ -112,12 +113,12 @@ APP_CSS = b"""
     font-size: 1.15em;
     font-weight: 700;
     margin-top: 10px;
-    color: alpha(white, 0.88);
+    color: alpha(@window_fg_color, 0.88);
 }
 .empty-sub {
     opacity: 0.55;
     margin-top: 18px; /* space under greeting title */
-    color: alpha(white, 0.7);
+    color: alpha(@window_fg_color, 0.7);
 }
 .empty-icon {
     opacity: 0.92;
@@ -151,12 +152,12 @@ APP_CSS = b"""
     color: @accent_fg_color;
     /* Speech-tail: sharp lower-right corner */
     border-bottom-right-radius: 0;
-    box-shadow: 0 1px 3px alpha(black, 0.3);
+    box-shadow: 0 1px 3px alpha(black, 0.18);
 }
 .chat-assistant {
     /* No fill - assistant text sits on the chat surface */
     background-color: transparent;
-    color: alpha(white, 0.92);
+    color: alpha(@window_fg_color, 0.92);
     border-radius: 0;
     box-shadow: none;
     padding-left: 0;
@@ -180,11 +181,11 @@ APP_CSS = b"""
     margin-top: 3px;
     margin-left: 4px;
     margin-right: 4px;
-    color: alpha(white, 0.7);
+    color: alpha(@window_fg_color, 0.7);
 }
 .chat-user-meta {
     opacity: 0.55;
-    color: alpha(white, 0.75);
+    color: alpha(@window_fg_color, 0.75);
 }
 
 /* typing indicator */
@@ -216,16 +217,17 @@ APP_CSS = b"""
     border-top: none;
 }
 .composer-shell {
-    background-color: alpha(white, 0.10);
+    /* fg-alpha works on both themes (white-on-dark / black-on-light) */
+    background-color: alpha(@window_fg_color, 0.08);
     border-radius: 22px;
-    border: 1px solid alpha(white, 0.10);
+    border: 1px solid alpha(@window_fg_color, 0.12);
     padding: 4px 4px 4px 12px;
-    box-shadow: 0 4px 18px alpha(black, 0.35), 0 1px 3px alpha(black, 0.25);
+    box-shadow: 0 4px 18px alpha(black, 0.12), 0 1px 3px alpha(black, 0.08);
 }
 .composer-shell:focus-within {
     border-color: alpha(@accent_bg_color, 0.55);
-    background-color: alpha(white, 0.12);
-    box-shadow: 0 6px 22px alpha(black, 0.4), 0 0 0 1px alpha(@accent_bg_color, 0.15);
+    background-color: alpha(@window_fg_color, 0.10);
+    box-shadow: 0 6px 22px alpha(black, 0.16), 0 0 0 1px alpha(@accent_bg_color, 0.15);
 }
 .composer-input {
     background: transparent;
@@ -236,7 +238,7 @@ APP_CSS = b"""
 .composer-input textview,
 .composer-input text {
     background: transparent;
-    color: alpha(white, 0.92);
+    color: alpha(@window_fg_color, 0.92);
 }
 .composer-scroll {
     background: transparent;
@@ -250,7 +252,7 @@ APP_CSS = b"""
 .composer-hint {
     font-size: 0.72em;
     opacity: 0.42;
-    color: alpha(white, 0.7);
+    color: alpha(@window_fg_color, 0.7);
     margin-bottom: 8px;
     transition: opacity 280ms ease;
 }
@@ -266,7 +268,7 @@ APP_CSS = b"""
 .composer-char-count {
     font-size: 0.72em;
     opacity: 0.55;
-    color: alpha(white, 0.7);
+    color: alpha(@window_fg_color, 0.7);
 }
 .composer-char-count.warning {
     opacity: 0.9;
