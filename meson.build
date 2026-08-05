@@ -60,6 +60,7 @@ runtime_python_sources = files(
   'app_settings.py',
   'composer_cli.py',
   'composer_geometry.py',
+  'connection_settings.py',
   'conversation_export.py',
   'conversation_lifecycle.py',
   'conversation_store.py',

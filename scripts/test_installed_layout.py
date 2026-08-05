@@ -56,6 +56,7 @@ REQUIRED_PY_MODULES = [
     "app_settings.py",
     "composer_cli.py",
     "composer_geometry.py",
+    "connection_settings.py",
     "conversation_export.py",
     "conversation_lifecycle.py",
     "conversation_store.py",
@@ -286,10 +287,10 @@ def main() -> int:
                     "-c",
                     "import sys; sys.path.insert(0, sys.argv[1]); "
                     "import release_info, app_settings, composer_cli, composer_geometry, "
-                    "conversation_export, conversation_lifecycle, conversation_store, "
-                    "health_probe, message_actions, message_widgets, model_profile, "
-                    "model_session, ollama_client, sidebar_history, transcript_view, "
-                    "window_view; "
+                    "connection_settings, conversation_export, conversation_lifecycle, "
+                    "conversation_store, health_probe, message_actions, message_widgets, "
+                    "model_profile, model_session, ollama_client, sidebar_history, "
+                    "transcript_view, window_view; "
                     "print('OK'); "
                     "print(str(transcript_view.WEB_DIR)); "
                     "print((transcript_view.WEB_DIR / 'index.html').is_file())",
@@ -301,10 +302,10 @@ def main() -> int:
             out_lines = import_check.stdout.strip().splitlines()
             results.check(
                 "[7] release_info/app_settings/composer_cli/composer_geometry/"
-                "conversation_export/conversation_lifecycle/conversation_store/"
-                "health_probe/message_actions/message_widgets/model_profile/"
-                "model_session/ollama_client/sidebar_history/transcript_view/"
-                "window_view all import",
+                "connection_settings/conversation_export/conversation_lifecycle/"
+                "conversation_store/health_probe/message_actions/message_widgets/"
+                "model_profile/model_session/ollama_client/sidebar_history/"
+                "transcript_view/window_view all import",
                 import_check.returncode == 0 and out_lines[:1] == ["OK"],
                 import_check.stderr[-500:],
             )

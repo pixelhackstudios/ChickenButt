@@ -149,6 +149,57 @@ def get_ollama_config(settings_path: Path | None = None) -> dict[str, Any]:
     return dict(load_settings(settings_path)["ollama"])
 
 
+def set_ollama_config(
+    *,
+    base_url: str | None = None,
+    connect_timeout_sec: float | None = None,
+    settings_dir: Path | None = None,
+    settings_path: Path | None = None,
+) -> dict[str, Any]:
+    """Persist Ollama connection fields; omit arguments to leave them unchanged.
+
+    Returns the normalized ``ollama`` block after write.
+    """
+
+    def mutate(data: dict) -> None:
+        ollama = data.setdefault("ollama", {})
+        if not isinstance(ollama, dict):
+            ollama = {}
+            data["ollama"] = ollama
+        if base_url is not None:
+            text = str(base_url).strip()
+            ollama["base_url"] = text if text else DEFAULT_BASE_URL
+        if connect_timeout_sec is not None:
+            ollama["connect_timeout_sec"] = connect_timeout_sec
+
+    updated = update_settings(
+        mutate, settings_dir=settings_dir, settings_path=settings_path
+    )
+    return dict(updated.get("ollama") or _default_ollama_block())
+
+
+def normalize_base_url(url: str | None) -> str:
+    """Return a trimmed base URL or the default when empty/invalid type."""
+    if not isinstance(url, str) or not url.strip():
+        return DEFAULT_BASE_URL
+    return url.strip().rstrip("/")
+
+
+def validate_base_url(url: str) -> str | None:
+    """Return an error message if *url* is not a usable http(s) base, else None."""
+    text = (url or "").strip()
+    if not text:
+        return "Enter an Ollama address."
+    lowered = text.lower()
+    if not (lowered.startswith("http://") or lowered.startswith("https://")):
+        return "Address must start with http:// or https://."
+    # Reject bare schemes and obvious non-hosts.
+    rest = text.split("://", 1)[-1]
+    if not rest or rest.startswith("/") or " " in text:
+        return "Enter a full address such as http://127.0.0.1:11434."
+    return None
+
+
 def update_settings(
     mutator: Any,
     *,

@@ -32,6 +32,7 @@ from conversation_store import ConversationStore
 from health_probe import HealthProbeController
 from message_actions import MessageActionController
 from message_widgets import ensure_md_css
+from connection_settings import ConnectionPreferences
 from model_profile import ModelProfileService
 from model_session import ModelLoadController
 from ollama_client import OllamaClient
@@ -462,6 +463,7 @@ class ChatSidebar(Adw.ApplicationWindow):
             title_provider=lambda conversation_id: "this chat",
         )
         self._streaming_engine: StreamingEngineController | None = None
+        self._connection_prefs: ConnectionPreferences | None = None
         self._on_close_request: Callable[[], bool] | None = None
         self._status_label: Gtk.Label | None = None
         self._requested_transcript_mode = _transcript_mode()
@@ -1093,40 +1095,28 @@ class ChatSidebar(Adw.ApplicationWindow):
             print(f"record metrics failed: {exc}", flush=True)
 
     def open_settings(self) -> None:
-        """Minimal settings shell — room for future prefs without scope creep."""
-        dialog = Adw.MessageDialog(
-            transient_for=self,
-            heading="Settings",
-            body=(
-                "Chat data is stored locally on this device under your user data "
-                "folder (chickenbutt). More preferences will appear here later."
-            ),
-        )
-        dialog.add_response("close", "Close")
-        dialog.add_response("open-data", "Open data folder")
-        dialog.set_default_response("close")
-        dialog.set_close_response("close")
+        """Phase 1 connection preferences (URL, timeout, status, local paths)."""
+        if self._connection_prefs is None:
+            self._connection_prefs = ConnectionPreferences(
+                parent=self,
+                client=self.client,
+                settings_dir=_SETTINGS_DIR,
+                settings_path=_SETTINGS_PATH,
+                on_connection_applied=self._on_connection_settings_applied,
+            )
+        self._connection_prefs.present()
 
-        def on_response(_d, response: str) -> None:
-            if response != "open-data":
-                return
-            path = Path(GLib.get_user_data_dir()) / "chickenbutt"
-            try:
-                path.mkdir(parents=True, exist_ok=True)
-                Gtk.FileLauncher.new(Gio.File.new_for_path(str(path))).launch(
-                    self, None, None, None
-                )
-            except Exception as exc:  # noqa: BLE001
-                # Fallback: xdg-open via Gio.AppInfo
-                try:
-                    Gio.AppInfo.launch_default_for_uri(
-                        path.as_uri(), None
-                    )
-                except Exception as exc2:  # noqa: BLE001
-                    print(f"open data folder: {exc} / {exc2}", flush=True)
-
-        dialog.connect("response", on_response)
-        dialog.present()
+    def _on_connection_settings_applied(self) -> None:
+        """After URL/timeout persist, re-probe health without changing models."""
+        # Controllers already share self.client; base_url/timeout were mutated
+        # in place. Refresh health so the banner reflects the new endpoint.
+        try:
+            if self._health_probe is not None and not self._streaming:
+                # Prefer the existing refresh path when not mid-stream/load.
+                if self._model_session is None or not self._model_session.is_loading:
+                    self._refresh_models()
+        except Exception as exc:  # noqa: BLE001
+            print(f"connection settings applied: {exc}", flush=True)
 
     def _on_sidebar_toggled(self, btn: Gtk.ToggleButton) -> None:
         """Forward toggle-button changes through the public sidebar entrypoint."""
