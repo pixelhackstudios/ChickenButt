@@ -103,7 +103,7 @@ export default function Install() {
           </div>
         </div>
 
-        {/* ---- Steps Installer Panels (Console Column) ---- */}
+        {/* ---- Steps: Ollama → ChickenButt → pull model (two installs, one pull) ---- */}
         <div className="relative space-y-6">
           {/* Step 1: Install Ollama */}
           <InstallerPanel num="01" title="Install Ollama" path="~">
@@ -113,27 +113,28 @@ export default function Install() {
             </div>
           </InstallerPanel>
 
-          {/* Step 2: Pull a model */}
-          <InstallerPanel num="02" title="Pull a model" path="~">
-            <div className="term-line">
-              <span className="term-prompt">$ </span>ollama pull gemma4:latest
-            </div>
-          </InstallerPanel>
-
-          {/* Step 3: Get ChickenButt (source / dev) */}
-          <InstallerPanel num="03" title="Or run from source" path="~/ChickenButt">
+          {/* Step 2: Install ChickenButt */}
+          <InstallerPanel num="02" title="Install ChickenButt" path="~/Downloads">
             <div className="term-line break-all sm:break-normal text-(--ink-300) mb-1">
-              Prefer Flatpak above for everyday use. Source is for hacking on ChickenButt.
+              Download the Flatpak from GitHub Releases, then:
             </div>
             <div className="term-line break-all sm:break-normal">
               <span className="term-prompt">$ </span>
-              git clone https://github.com/pixelhackstudios/ChickenButt.git
+              flatpak install --user ./ChickenButt-*-x86_64.flatpak
             </div>
-            <div className="term-line">
-              <span className="term-prompt">$ </span>cd ChickenButt
+            <div className="term-line break-all sm:break-normal">
+              <span className="term-prompt">$ </span>
+              flatpak run io.github.pixelhackstudios.ChickenButt
             </div>
+            <div className="term-line break-all sm:break-normal text-(--ink-400) mt-2">
+              Source install (optional): git clone … then cd ChickenButt and ./run.sh
+            </div>
+          </InstallerPanel>
+
+          {/* Step 3: Pull a model */}
+          <InstallerPanel num="03" title="Pull a model" path="~">
             <div className="term-line">
-              <span className="term-prompt">$ </span>./run.sh
+              <span className="term-prompt">$ </span>ollama pull gemma4:latest
             </div>
           </InstallerPanel>
         </div>
