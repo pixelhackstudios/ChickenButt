@@ -436,7 +436,12 @@ def test_profile_digest_policy(r: Results, tmp: Path) -> None:
     r.check("last_seen_digest updated", prof2.get("last_seen_digest") == "sha256:bbb")
 
     params = svc.request_params("qwen3:8b")
-    r.check("request_params carries options", params.options == {"num_ctx": 8192, "temperature": 0.4})
+    # Tier/style axes re-materialize options (precise → temperature 0.2).
+    r.check(
+        "request_params carries options",
+        params.options == {"num_ctx": 8192, "temperature": 0.2},
+        str(params.options),
+    )
     r.check("request_params keep_alive", params.keep_alive == "5m")
     empty = svc.request_params("never-configured:7b")
     r.check("unknown model empty params", empty.is_empty())

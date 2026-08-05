@@ -1,8 +1,10 @@
-"""Phase 1 connection preferences — Adwaita surface for Ollama URL/timeout.
+"""Adwaita preferences: connection (Phase 1) + per-model basics (Phase 2).
 
-No model options, Model Fit, presets, or calibration. Controllers share the
-same ``OllamaClient`` instance; connection changes update that instance
-in place so load/chat keep working without rewiring.
+Phase 2 covers context tier, response style, max output, keep-alive, and
+capability-gated thinking. No Model Fit, advanced sampling, or calibration.
+
+Controllers share the same ``OllamaClient`` instance; connection changes
+update that instance in place so load/chat keep working without rewiring.
 """
 
 from __future__ import annotations
@@ -20,6 +22,19 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Adw, Gio, GLib, Gtk
 
 import app_settings as _app_settings
+from model_profile import (
+    CONTEXT_TIER_IDS,
+    CONTEXT_TIER_LABELS,
+    CONTEXT_TIER_NUM_CTX,
+    KEEP_ALIVE_IDS,
+    KEEP_ALIVE_LABELS,
+    KEEP_ALIVE_VALUES,
+    RESPONSE_STYLE_IDS,
+    RESPONSE_STYLE_LABELS,
+    RESPONSE_STYLE_TEMPERATURE,
+    ModelProfileService,
+    keep_alive_id_for_value,
+)
 from ollama_client import OllamaClient, OllamaError
 
 
@@ -58,19 +73,23 @@ def apply_client_connection(
 
 
 class ConnectionPreferences:
-    """Build and present the connection-only preferences dialog."""
+    """Build and present the Settings preferences dialog (connection + model)."""
 
     def __init__(
         self,
         *,
         parent: Adw.ApplicationWindow,
         client: OllamaClient,
+        profiles: ModelProfileService,
+        get_selected_model: Callable[[], str | None],
         settings_dir: Path | None = None,
         settings_path: Path | None = None,
         on_connection_applied: Callable[[], None] | None = None,
     ) -> None:
         self._parent = parent
         self._client = client
+        self._profiles = profiles
+        self._get_selected_model = get_selected_model
         self._settings_dir = settings_dir
         self._settings_path = settings_path
         self._on_connection_applied = on_connection_applied
@@ -80,21 +99,45 @@ class ConnectionPreferences:
         self._status_row: Adw.ActionRow | None = None
         self._version_row: Adw.ActionRow | None = None
         self._test_btn: Gtk.Button | None = None
+        # Model page widgets
+        self._model_title_row: Adw.ActionRow | None = None
+        self._context_row: Adw.ComboRow | None = None
+        self._custom_ctx_row: Adw.SpinRow | None = None
+        self._style_row: Adw.ComboRow | None = None
+        self._temp_row: Adw.SpinRow | None = None
+        self._max_out_row: Adw.SpinRow | None = None
+        self._keep_alive_row: Adw.ComboRow | None = None
+        self._think_row: Adw.SwitchRow | None = None
+        self._reset_btn: Gtk.Button | None = None
+        self._model_group: Adw.PreferencesGroup | None = None
         self._applying = False
+        self._model_loading = False
         self._test_generation = 0
+        self._caps_generation = 0
+        self._think_supported = False
+        self._bound_model: str | None = None
 
     def present(self) -> None:
         if self._dialog is not None:
             try:
                 self._dialog.present(self._parent)
+                self.refresh_selected_model()
                 return
             except Exception:  # noqa: BLE001
                 self._dialog = None
         self._dialog = self._build()
         self._load_from_settings()
+        self.refresh_selected_model()
         self._dialog.present(self._parent)
         # Non-blocking status probe with the currently applied client.
         self._refresh_status_async(use_form_values=False)
+
+    def refresh_selected_model(self) -> None:
+        """Reload model controls for the window's current model (no cross-leak)."""
+        if self._dialog is None:
+            return
+        self._load_model_prefs()
+        self._probe_thinking_capability()
 
     def _build(self) -> Adw.PreferencesDialog:
         dialog = Adw.PreferencesDialog()
@@ -196,6 +239,100 @@ class ConnectionPreferences:
         data_row.set_activatable_widget(data_btn)
         data.add(data_row)
 
+        # --- Model basics (Phase 2) ---
+        model_page = Adw.PreferencesPage()
+        model_page.set_title("Model")
+        model_page.set_icon_name("emoji-objects-symbolic")
+        dialog.add(model_page)
+
+        model_group = Adw.PreferencesGroup()
+        model_group.set_title("Selected model")
+        model_group.set_description(
+            "These preferences apply to the model currently selected in the "
+            "sidebar. Empty or reset profiles use Ollama’s defaults (optional "
+            "request fields are omitted)."
+        )
+        model_page.add(model_group)
+        self._model_group = model_group
+
+        model_title = Adw.ActionRow()
+        model_title.set_title("Model")
+        model_title.set_subtitle("No model selected")
+        model_group.add(model_title)
+        self._model_title_row = model_title
+
+        context_row = Adw.ComboRow()
+        context_row.set_title("Context")
+        context_row.set_model(Gtk.StringList.new(list(CONTEXT_TIER_LABELS)))
+        context_row.connect("notify::selected", self._on_context_tier_changed)
+        model_group.add(context_row)
+        self._context_row = context_row
+
+        ctx_adj = Gtk.Adjustment(
+            value=8192, lower=512, upper=262144, step_increment=512, page_increment=4096
+        )
+        custom_ctx = Adw.SpinRow(adjustment=ctx_adj, digits=0)
+        custom_ctx.set_title("Custom context size")
+        custom_ctx.set_subtitle("Tokens (num_ctx)")
+        custom_ctx.set_visible(False)
+        custom_ctx.connect("notify::value", self._on_custom_ctx_changed)
+        model_group.add(custom_ctx)
+        self._custom_ctx_row = custom_ctx
+
+        style_row = Adw.ComboRow()
+        style_row.set_title("Response style")
+        style_row.set_model(Gtk.StringList.new(list(RESPONSE_STYLE_LABELS)))
+        style_row.connect("notify::selected", self._on_style_changed)
+        model_group.add(style_row)
+        self._style_row = style_row
+
+        temp_adj = Gtk.Adjustment(
+            value=0.7, lower=0.0, upper=2.0, step_increment=0.05, page_increment=0.1
+        )
+        temp_row = Adw.SpinRow(adjustment=temp_adj, digits=2)
+        temp_row.set_title("Creativity")
+        temp_row.set_subtitle("Temperature — editing marks Response style as Custom")
+        temp_row.connect("notify::value", self._on_temp_changed)
+        model_group.add(temp_row)
+        self._temp_row = temp_row
+
+        max_adj = Gtk.Adjustment(
+            value=0, lower=0, upper=128000, step_increment=64, page_increment=256
+        )
+        max_out = Adw.SpinRow(adjustment=max_adj, digits=0)
+        max_out.set_title("Maximum output")
+        max_out.set_subtitle("0 = Ollama default (omit num_predict)")
+        max_out.connect("notify::value", self._on_max_out_changed)
+        model_group.add(max_out)
+        self._max_out_row = max_out
+
+        keep_row = Adw.ComboRow()
+        keep_row.set_title("Keep model loaded")
+        keep_row.set_model(Gtk.StringList.new(list(KEEP_ALIVE_LABELS)))
+        keep_row.connect("notify::selected", self._on_keep_alive_changed)
+        model_group.add(keep_row)
+        self._keep_alive_row = keep_row
+
+        think_row = Adw.SwitchRow()
+        think_row.set_title("Show reasoning")
+        think_row.set_subtitle("Only available for models that support thinking")
+        think_row.set_sensitive(False)
+        think_row.connect("notify::active", self._on_think_changed)
+        model_group.add(think_row)
+        self._think_row = think_row
+
+        reset_row = Adw.ActionRow()
+        reset_row.set_title("Reset this model")
+        reset_row.set_subtitle("Clear preferences; keep performance observations")
+        reset_btn = Gtk.Button(label="Reset to defaults")
+        reset_btn.set_valign(Gtk.Align.CENTER)
+        reset_btn.add_css_class("destructive-action")
+        reset_btn.connect("clicked", self._on_reset_clicked)
+        reset_row.add_suffix(reset_btn)
+        reset_row.set_activatable_widget(reset_btn)
+        model_group.add(reset_row)
+        self._reset_btn = reset_btn
+
         dialog.connect("closed", self._on_closed)
         return dialog
 
@@ -244,7 +381,312 @@ class ConnectionPreferences:
     def _on_closed(self, *_args) -> None:
         # Flush any unapplied entry text when the dialog closes.
         self._apply_form(show_errors=False)
+        self._save_model_prefs()
         self._dialog = None
+        self._bound_model = None
+
+    # --- Model basics ---
+
+    def _selected_model_name(self) -> str | None:
+        try:
+            name = self._get_selected_model()
+        except Exception:  # noqa: BLE001
+            return None
+        if not name or not str(name).strip():
+            return None
+        return str(name)
+
+    def _set_combo_by_id(
+        self, row: Adw.ComboRow | None, ids: tuple[str, ...], selected_id: str
+    ) -> None:
+        if row is None:
+            return
+        try:
+            idx = ids.index(selected_id)
+        except ValueError:
+            idx = 0
+        row.set_selected(idx)
+
+    def _combo_id(self, row: Adw.ComboRow | None, ids: tuple[str, ...]) -> str:
+        if row is None:
+            return ids[0]
+        idx = int(row.get_selected())
+        if idx < 0 or idx >= len(ids):
+            return ids[0]
+        return ids[idx]
+
+    def _load_model_prefs(self) -> None:
+        model = self._selected_model_name()
+        self._bound_model = model
+        self._model_loading = True
+        try:
+            if self._model_title_row is not None:
+                self._model_title_row.set_subtitle(model or "No model selected")
+
+            enabled = bool(model)
+            for w in (
+                self._context_row,
+                self._custom_ctx_row,
+                self._style_row,
+                self._temp_row,
+                self._max_out_row,
+                self._keep_alive_row,
+                self._reset_btn,
+            ):
+                if w is not None:
+                    w.set_sensitive(enabled)
+
+            profile = self._profiles.get_profile(model) if model else {}
+            options = profile.get("options") if isinstance(profile.get("options"), dict) else {}
+
+            tier = profile.get("context_tier")
+            if not isinstance(tier, str) or tier not in CONTEXT_TIER_IDS:
+                # Infer from stored num_ctx when possible.
+                nctx = options.get("num_ctx")
+                tier = "auto"
+                if isinstance(nctx, (int, float)) and int(nctx) > 0:
+                    nctx_i = int(nctx)
+                    for tid, val in CONTEXT_TIER_NUM_CTX.items():
+                        if val == nctx_i:
+                            tier = tid
+                            break
+                    else:
+                        tier = "custom"
+            self._set_combo_by_id(self._context_row, CONTEXT_TIER_IDS, tier)
+            if self._custom_ctx_row is not None:
+                nctx = options.get("num_ctx")
+                if isinstance(nctx, (int, float)) and int(nctx) > 0:
+                    self._custom_ctx_row.set_value(float(int(nctx)))
+                else:
+                    self._custom_ctx_row.set_value(8192.0)
+                self._custom_ctx_row.set_visible(tier == "custom")
+
+            style = profile.get("response_style")
+            if not isinstance(style, str) or style not in RESPONSE_STYLE_IDS:
+                temp = options.get("temperature")
+                style = "balanced"
+                if isinstance(temp, (int, float)):
+                    for sid, tval in RESPONSE_STYLE_TEMPERATURE.items():
+                        if tval is not None and abs(float(temp) - tval) < 0.001:
+                            style = sid
+                            break
+                    else:
+                        style = "custom"
+                elif not options and not profile:
+                    # Empty profile: show Balanced as a neutral label but do not
+                    # persist temperature until the user changes something.
+                    style = "balanced"
+            self._set_combo_by_id(self._style_row, RESPONSE_STYLE_IDS, style)
+            if self._temp_row is not None:
+                temp = options.get("temperature")
+                if isinstance(temp, (int, float)):
+                    self._temp_row.set_value(float(temp))
+                else:
+                    preset = RESPONSE_STYLE_TEMPERATURE.get(style)
+                    # Balanced / omit → show a neutral 0.7 in the spinner only.
+                    self._temp_row.set_value(
+                        float(preset if preset is not None else 0.7)
+                    )
+
+            if self._max_out_row is not None:
+                npred = options.get("num_predict")
+                if isinstance(npred, (int, float)) and int(npred) > 0:
+                    self._max_out_row.set_value(float(int(npred)))
+                else:
+                    self._max_out_row.set_value(0.0)
+
+            ka_id = keep_alive_id_for_value(profile.get("keep_alive"))
+            self._set_combo_by_id(self._keep_alive_row, KEEP_ALIVE_IDS, ka_id)
+
+            if self._think_row is not None:
+                think = profile.get("think")
+                self._think_row.set_active(bool(think) is True or think is True)
+                # Sensitivity updated by capability probe.
+                self._think_row.set_sensitive(False)
+                self._think_supported = False
+        finally:
+            self._model_loading = False
+
+    def _probe_thinking_capability(self) -> None:
+        model = self._selected_model_name()
+        self._caps_generation += 1
+        gen = self._caps_generation
+        if not model:
+            if self._think_row is not None:
+                self._think_row.set_sensitive(False)
+                self._think_row.set_subtitle(
+                    "Only available for models that support thinking"
+                )
+            return
+
+        def work() -> None:
+            supported = False
+            try:
+                desc = self._client.show_model(model)
+                caps = {c.lower() for c in (desc.capabilities or ())}
+                supported = "thinking" in caps
+            except Exception:  # noqa: BLE001
+                supported = False
+
+            def done() -> bool:
+                if gen != self._caps_generation:
+                    return False
+                self._think_supported = supported
+                if self._think_row is not None:
+                    self._think_row.set_sensitive(bool(model) and supported)
+                    if supported:
+                        self._think_row.set_subtitle(
+                            "Send Ollama’s think flag for this model"
+                        )
+                    else:
+                        self._think_row.set_subtitle(
+                            "This model does not advertise thinking support"
+                        )
+                        # Do not force-clear stored think here — only hide control
+                        # effect on next save when unsupported.
+                return False
+
+            GLib.idle_add(done)
+
+        threading.Thread(
+            target=work, daemon=True, name="cb-settings-think-caps"
+        ).start()
+
+    def _save_model_prefs(self) -> None:
+        if self._model_loading:
+            return
+        model = self._bound_model or self._selected_model_name()
+        if not model:
+            return
+
+        tier = self._combo_id(self._context_row, CONTEXT_TIER_IDS)
+        style = self._combo_id(self._style_row, RESPONSE_STYLE_IDS)
+        nctx_custom = None
+        if self._custom_ctx_row is not None:
+            nctx_custom = int(self._custom_ctx_row.get_value())
+        temp_custom = None
+        if self._temp_row is not None and style == "custom":
+            temp_custom = float(self._temp_row.get_value())
+        npred = None
+        if self._max_out_row is not None:
+            raw = int(self._max_out_row.get_value())
+            npred = raw if raw > 0 else None
+
+        ka_id = self._combo_id(self._keep_alive_row, KEEP_ALIVE_IDS)
+        keep_alive = KEEP_ALIVE_VALUES.get(ka_id)
+
+        think: bool | None = None
+        clear_think = True
+        if self._think_supported and self._think_row is not None:
+            if self._think_row.get_active():
+                think = True
+                clear_think = False
+            else:
+                think = None
+                clear_think = True
+
+        # Pure UI defaults with no optional fields → empty profile (omit all).
+        is_pure_default = (
+            tier == "auto"
+            and style == "balanced"
+            and npred is None
+            and keep_alive is None
+            and think is None
+        )
+        if is_pure_default:
+            self._profiles.reset_preferences(model)
+            return
+
+        self._profiles.apply_model_basics(
+            model,
+            context_tier=tier,
+            response_style=style,
+            num_ctx_custom=nctx_custom if tier == "custom" else None,
+            temperature_custom=temp_custom,
+            num_predict=npred,
+            keep_alive=keep_alive,
+            think=think,
+            clear_keep_alive=keep_alive is None,
+            clear_think=clear_think,
+        )
+
+    def _on_context_tier_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        tier = self._combo_id(self._context_row, CONTEXT_TIER_IDS)
+        if self._custom_ctx_row is not None:
+            self._custom_ctx_row.set_visible(tier == "custom")
+            if tier != "custom" and tier in CONTEXT_TIER_NUM_CTX:
+                nctx = CONTEXT_TIER_NUM_CTX[tier]
+                if nctx is not None:
+                    self._model_loading = True
+                    try:
+                        self._custom_ctx_row.set_value(float(nctx))
+                    finally:
+                        self._model_loading = False
+        self._save_model_prefs()
+
+    def _on_custom_ctx_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        # Editing the custom size marks context axis Custom only.
+        if self._combo_id(self._context_row, CONTEXT_TIER_IDS) != "custom":
+            self._model_loading = True
+            try:
+                self._set_combo_by_id(self._context_row, CONTEXT_TIER_IDS, "custom")
+                if self._custom_ctx_row is not None:
+                    self._custom_ctx_row.set_visible(True)
+            finally:
+                self._model_loading = False
+        self._save_model_prefs()
+
+    def _on_style_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        style = self._combo_id(self._style_row, RESPONSE_STYLE_IDS)
+        preset = RESPONSE_STYLE_TEMPERATURE.get(style)
+        if preset is not None and self._temp_row is not None:
+            self._model_loading = True
+            try:
+                self._temp_row.set_value(float(preset))
+            finally:
+                self._model_loading = False
+        self._save_model_prefs()
+
+    def _on_temp_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        # Editing temperature marks only the response-style axis Custom.
+        if self._combo_id(self._style_row, RESPONSE_STYLE_IDS) != "custom":
+            self._model_loading = True
+            try:
+                self._set_combo_by_id(self._style_row, RESPONSE_STYLE_IDS, "custom")
+            finally:
+                self._model_loading = False
+        self._save_model_prefs()
+
+    def _on_max_out_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        self._save_model_prefs()
+
+    def _on_keep_alive_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        self._save_model_prefs()
+
+    def _on_think_changed(self, *_args) -> None:
+        if self._model_loading:
+            return
+        self._save_model_prefs()
+
+    def _on_reset_clicked(self, *_args) -> None:
+        model = self._bound_model or self._selected_model_name()
+        if not model:
+            return
+        self._profiles.reset_preferences(model)
+        self._load_model_prefs()
+        self._probe_thinking_capability()
 
     def _apply_form(self, *, show_errors: bool) -> bool:
         """Validate, persist, and reconfigure the shared client.

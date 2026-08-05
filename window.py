@@ -1095,11 +1095,17 @@ class ChatSidebar(Adw.ApplicationWindow):
             print(f"record metrics failed: {exc}", flush=True)
 
     def open_settings(self) -> None:
-        """Phase 1 connection preferences (URL, timeout, status, local paths)."""
+        """Settings: connection (Phase 1) + per-model basics (Phase 2)."""
         if self._connection_prefs is None:
             self._connection_prefs = ConnectionPreferences(
                 parent=self,
                 client=self.client,
+                profiles=self._model_profiles,
+                get_selected_model=lambda: (
+                    self._model_session.current_model
+                    if self._model_session is not None
+                    else None
+                ),
                 settings_dir=_SETTINGS_DIR,
                 settings_path=_SETTINGS_PATH,
                 on_connection_applied=self._on_connection_settings_applied,
@@ -1354,6 +1360,12 @@ class ChatSidebar(Adw.ApplicationWindow):
 
     def _on_model_selected(self, *_args) -> None:
         self._health_probe._on_model_selected(*_args)
+        # Keep open Settings model page in sync without leaking prior values.
+        if self._connection_prefs is not None:
+            try:
+                self._connection_prefs.refresh_selected_model()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _refresh_models(self) -> bool:
         return self._health_probe._refresh_models()
