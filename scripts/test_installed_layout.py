@@ -35,6 +35,11 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+import release_info  # noqa: E402
+
+# Version string the installed launcher and ./run.sh must print.
+EXPECTED_VERSION_LINE = f"ChickenButt {release_info.VERSION}"
 
 
 class Results:
@@ -263,8 +268,8 @@ def main() -> int:
             f"rc={run.returncode} stderr={run.stderr[-500:]}",
         )
         results.check(
-            "[3] `chickenbutt --version` prints exactly 'ChickenButt 0.1.0'",
-            run.stdout.strip() == "ChickenButt 0.1.0",
+            f"[3] `chickenbutt --version` prints exactly {EXPECTED_VERSION_LINE!r}",
+            run.stdout.strip() == EXPECTED_VERSION_LINE,
             repr(run.stdout),
         )
 
@@ -333,8 +338,8 @@ def main() -> int:
         ["./run.sh", "--version"], cwd=REPO_ROOT, capture_output=True, text=True
     )
     results.check(
-        "[10] ./run.sh --version exits 0 and prints 'ChickenButt 0.1.0'",
-        run_sh.returncode == 0 and run_sh.stdout.strip() == "ChickenButt 0.1.0",
+        f"[10] ./run.sh --version exits 0 and prints {EXPECTED_VERSION_LINE!r}",
+        run_sh.returncode == 0 and run_sh.stdout.strip() == EXPECTED_VERSION_LINE,
         f"rc={run_sh.returncode} stdout={run_sh.stdout!r} stderr={run_sh.stderr[-300:]!r}",
     )
 
