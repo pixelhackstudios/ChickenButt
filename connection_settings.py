@@ -19,8 +19,9 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gio", "2.0")
+gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gio, GLib, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 import app_settings as _app_settings
 from model_fit import (
@@ -52,6 +53,38 @@ from model_profile import (
     num_ctx_for_tier,
 )
 from ollama_client import ModelDescriptor, OllamaClient, OllamaError
+
+_prefs_css_installed = False
+
+
+def _ensure_preferences_css() -> None:
+    """Spacing for the embedded settings panel (main-column content swap)."""
+    global _prefs_css_installed
+    if _prefs_css_installed:
+        return
+    provider = Gtk.CssProvider()
+    provider.load_from_string(
+        """
+        /* Full-column settings page (Connection · Model · Model Fit) */
+        .chickenbutt-settings-panel {
+            background-color: #121216;
+        }
+        .chickenbutt-settings-panel headerbar {
+            padding-top: 10px;
+            padding-bottom: 8px;
+            background-color: #121216;
+        }
+        .chickenbutt-settings-panel adw-view-switcher {
+            margin-top: 2px;
+        }
+        """
+    )
+    display = Gdk.Display.get_default()
+    if display is not None:
+        Gtk.StyleContext.add_provider_for_display(
+            display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+    _prefs_css_installed = True
 
 
 def open_folder(path: Path, *, parent: Gtk.Window | None = None) -> None:
@@ -89,7 +122,7 @@ def apply_client_connection(
 
 
 class ConnectionPreferences:
-    """Build and present the Settings preferences dialog (connection + model)."""
+    """Settings UI: connection, per-model basics, Model Fit (embedded main column)."""
 
     def __init__(
         self,
@@ -102,6 +135,7 @@ class ConnectionPreferences:
         settings_dir: Path | None = None,
         settings_path: Path | None = None,
         on_connection_applied: Callable[[], None] | None = None,
+        on_close: Callable[[], None] | None = None,
     ) -> None:
         self._parent = parent
         self._client = client
@@ -111,7 +145,8 @@ class ConnectionPreferences:
         self._settings_dir = settings_dir
         self._settings_path = settings_path
         self._on_connection_applied = on_connection_applied
-        self._dialog: Adw.PreferencesDialog | None = None
+        self._on_close = on_close
+        self._panel: Gtk.Widget | None = None
         self._url_row: Adw.EntryRow | None = None
         self._timeout_row: Adw.SpinRow | None = None
         self._status_row: Adw.ActionRow | None = None
@@ -139,38 +174,92 @@ class ConnectionPreferences:
         self._think_supported = False
         self._bound_model: str | None = None
 
+    def ensure_panel(self) -> Gtk.Widget:
+        """Build the settings page once; reuse thereafter."""
+        if self._panel is None:
+            self._panel = self._build()
+            self._load_from_settings()
+        return self._panel
+
     def present(self) -> None:
-        if self._dialog is not None:
-            try:
-                self._dialog.present(self._parent)
-                self.refresh_selected_model()
-                return
-            except Exception:  # noqa: BLE001
-                self._dialog = None
-        self._dialog = self._build()
-        self._load_from_settings()
+        """Refresh live data when the settings page is shown."""
+        self.ensure_panel()
         self.refresh_selected_model()
-        self._dialog.present(self._parent)
         # Non-blocking status probe with the currently applied client.
         self._refresh_status_async(use_form_values=False)
 
+    def dismiss(self) -> None:
+        """Flush form state when leaving settings (does not destroy the panel)."""
+        self._apply_form(show_errors=False)
+        self._save_model_prefs()
+        self._bound_model = None
+
     def refresh_selected_model(self) -> None:
         """Reload model controls for the window's current model (no cross-leak)."""
-        if self._dialog is None:
+        if self._panel is None:
             return
         self._load_model_prefs()
         self._probe_thinking_capability()
         self._refresh_model_fit_async()
 
-    def _build(self) -> Adw.PreferencesDialog:
-        dialog = Adw.PreferencesDialog()
-        dialog.set_title("Settings")
-        dialog.set_search_enabled(False)
+    def _request_close(self, *_args) -> None:
+        if self._on_close is not None:
+            try:
+                self._on_close()
+            except Exception as exc:  # noqa: BLE001
+                print(f"settings close: {exc}", flush=True)
+
+    def _build(self) -> Gtk.Widget:
+        """Embedded full-column settings page (not a floating dialog)."""
+        _ensure_preferences_css()
+        toolbar = Adw.ToolbarView()
+        toolbar.add_css_class("chickenbutt-settings-panel")
+        toolbar.set_hexpand(True)
+        toolbar.set_vexpand(True)
+
+        header = Adw.HeaderBar()
+        header.set_show_end_title_buttons(False)
+        header.set_show_start_title_buttons(False)
+
+        back = Gtk.Button()
+        back.set_icon_name("go-previous-symbolic")
+        back.set_tooltip_text("Back to chat")
+        back.set_valign(Gtk.Align.CENTER)
+        try:
+            back.set_cursor_from_name("pointer")
+        except Exception:  # noqa: BLE001
+            pass
+        back.connect("clicked", self._request_close)
+        header.pack_start(back)
+
+        stack = Adw.ViewStack()
+        stack.set_hexpand(True)
+        stack.set_vexpand(True)
+
+        switcher = Adw.ViewSwitcher()
+        switcher.set_stack(stack)
+        try:
+            switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
+        except Exception:  # noqa: BLE001
+            pass
+        header.set_title_widget(switcher)
+        toolbar.add_top_bar(header)
+
+        def _add_page(
+            page: Adw.PreferencesPage, name: str, title: str, icon: str
+        ) -> None:
+            page.set_hexpand(True)
+            page.set_vexpand(True)
+            stack_page = stack.add_titled(page, name, title)
+            try:
+                stack_page.set_icon_name(icon)
+            except Exception:  # noqa: BLE001
+                pass
 
         page = Adw.PreferencesPage()
         page.set_title("Connection")
         page.set_icon_name("network-server-symbolic")
-        dialog.add(page)
+        _add_page(page, "connection", "Connection", "network-server-symbolic")
 
         conn = Adw.PreferencesGroup()
         conn.set_title("Ollama")
@@ -266,7 +355,7 @@ class ConnectionPreferences:
         model_page = Adw.PreferencesPage()
         model_page.set_title("Model")
         model_page.set_icon_name("emoji-objects-symbolic")
-        dialog.add(model_page)
+        _add_page(model_page, "model", "Model", "emoji-objects-symbolic")
 
         model_group = Adw.PreferencesGroup()
         model_group.set_title("Selected model")
@@ -360,7 +449,7 @@ class ConnectionPreferences:
         fit_page = Adw.PreferencesPage()
         fit_page.set_title("Model Fit")
         fit_page.set_icon_name("emblem-ok-symbolic")
-        dialog.add(fit_page)
+        _add_page(fit_page, "model-fit", "Model Fit", "emblem-ok-symbolic")
 
         fit_intro = Adw.PreferencesGroup()
         fit_intro.set_title("Model Fit")
@@ -422,8 +511,8 @@ class ConnectionPreferences:
         convo.add(warn)
         self._fit_warning_row = warn
 
-        dialog.connect("closed", self._on_closed)
-        return dialog
+        toolbar.set_content(stack)
+        return toolbar
 
     def _load_from_settings(self) -> None:
         cfg = _app_settings.get_ollama_config(self._settings_path)
@@ -466,13 +555,6 @@ class ConnectionPreferences:
         if self._applying:
             return
         self._apply_form(show_errors=False)
-
-    def _on_closed(self, *_args) -> None:
-        # Flush any unapplied entry text when the dialog closes.
-        self._apply_form(show_errors=False)
-        self._save_model_prefs()
-        self._dialog = None
-        self._bound_model = None
 
     # --- Model basics ---
 

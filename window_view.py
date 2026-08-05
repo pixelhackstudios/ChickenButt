@@ -553,5 +553,5 @@ def assemble_chat_surface(
     root_overlay.set_vexpand(True)
     root_overlay.set_child(outer)
     root_overlay.add_overlay(load_overlay)
-    toolbar_view.set_content(root_overlay)
+    # Caller sets toolbar content (chat vs settings stack lives on ChatSidebar).
     return root_overlay

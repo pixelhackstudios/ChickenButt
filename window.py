@@ -464,6 +464,8 @@ class ChatSidebar(Adw.ApplicationWindow):
         )
         self._streaming_engine: StreamingEngineController | None = None
         self._connection_prefs: ConnectionPreferences | None = None
+        self._main_stack: Gtk.Stack | None = None
+        self._settings_open = False
         self._on_close_request: Callable[[], bool] | None = None
         self._status_label: Gtk.Label | None = None
         self._requested_transcript_mode = _transcript_mode()
@@ -844,6 +846,9 @@ class ChatSidebar(Adw.ApplicationWindow):
 
     def _on_key(self, _controller, keyval, _keycode, _state) -> bool:
         if keyval == Gdk.KEY_Escape:
+            if self._settings_open:
+                self.close_settings()
+                return True
             self.set_visible(False)
             return True
         return False
@@ -909,7 +914,14 @@ class ChatSidebar(Adw.ApplicationWindow):
         )
         self.add_action(exp_json)
         hide_action = Gio.SimpleAction.new("hide", None)
-        hide_action.connect("activate", lambda *_: self.hide_to_tray())
+        hide_action.connect(
+            "activate",
+            lambda *_: (
+                self.close_settings()
+                if self._settings_open
+                else self.hide_to_tray()
+            ),
+        )
         self.add_action(hide_action)
         max_action = Gio.SimpleAction.new("maximize", None)
         max_action.connect("activate", lambda *_: self.toggle_maximize())
@@ -989,6 +1001,15 @@ class ChatSidebar(Adw.ApplicationWindow):
             composer_bar=composer.bar,
             load_overlay=self._load_overlay,
         )
+        # Main column stack: chat surface vs embedded settings (full height/width).
+        self._main_stack = Gtk.Stack()
+        self._main_stack.set_hexpand(True)
+        self._main_stack.set_vexpand(True)
+        self._main_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self._main_stack.set_transition_duration(120)
+        self._main_stack.add_named(self._root_overlay, "chat")
+        chrome.toolbar_view.set_content(self._main_stack)
+        self._main_stack.set_visible_child_name("chat")
 
         self._sidebar_history = SidebarHistoryController(
             store=self._store,
@@ -1094,14 +1115,16 @@ class ChatSidebar(Adw.ApplicationWindow):
         except Exception as exc:  # noqa: BLE001
             print(f"record metrics failed: {exc}", flush=True)
         # Refresh open Model Fit so last-response rates update (observational).
-        if self._connection_prefs is not None:
+        if self._settings_open and self._connection_prefs is not None:
             try:
                 self._connection_prefs.refresh_selected_model()
             except Exception:  # noqa: BLE001
                 pass
 
     def open_settings(self) -> None:
-        """Settings: connection (Phase 1) + per-model basics (Phase 2)."""
+        """Swap main column to the embedded Settings page (full height/width)."""
+        if self._main_stack is None:
+            return
         if self._connection_prefs is None:
             self._connection_prefs = ConnectionPreferences(
                 parent=self,
@@ -1120,8 +1143,26 @@ class ChatSidebar(Adw.ApplicationWindow):
                 settings_dir=_SETTINGS_DIR,
                 settings_path=_SETTINGS_PATH,
                 on_connection_applied=self._on_connection_settings_applied,
+                on_close=self.close_settings,
             )
+            panel = self._connection_prefs.ensure_panel()
+            self._main_stack.add_named(panel, "settings")
         self._connection_prefs.present()
+        self._main_stack.set_visible_child_name("settings")
+        self._settings_open = True
+
+    def close_settings(self) -> None:
+        """Return main column to chat; flush settings form state."""
+        if not self._settings_open:
+            return
+        if self._connection_prefs is not None:
+            try:
+                self._connection_prefs.dismiss()
+            except Exception as exc:  # noqa: BLE001
+                print(f"settings dismiss: {exc}", flush=True)
+        if self._main_stack is not None:
+            self._main_stack.set_visible_child_name("chat")
+        self._settings_open = False
 
     def _on_connection_settings_applied(self) -> None:
         """After URL/timeout persist, re-probe health without changing models."""
@@ -1372,7 +1413,7 @@ class ChatSidebar(Adw.ApplicationWindow):
     def _on_model_selected(self, *_args) -> None:
         self._health_probe._on_model_selected(*_args)
         # Keep open Settings model page in sync without leaking prior values.
-        if self._connection_prefs is not None:
+        if self._settings_open and self._connection_prefs is not None:
             try:
                 self._connection_prefs.refresh_selected_model()
             except Exception:  # noqa: BLE001
