@@ -69,12 +69,8 @@ def _register_app_resources() -> None:
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # libadwaita Styles & Appearance docs:
-        # ADW_COLOR_SCHEME_DEFAULT on the default StyleManager is equivalent to
-        # PREFER_LIGHT — light unless the system prefers dark (Settings portal /
-        # freedesktop color-scheme). Do not invent themes or map GTK_THEME.
-        # Evolution's GTK_THEME=Adwaita:dark path is for classic GTK theming;
-        # this app is libadwaita and uses the color-scheme portal instead.
+        # Follow the desktop light/dark preference (libadwaita default).
+        # Do not invent an app theme or set GTK_THEME.
         try:
             Adw.StyleManager.get_default().set_color_scheme(
                 Adw.ColorScheme.DEFAULT

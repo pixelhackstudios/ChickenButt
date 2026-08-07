@@ -124,7 +124,7 @@ class WebTranscriptView(Gtk.Box):
 
         self.append(self._view)
 
-        # Follow Adwaita color scheme
+        # Match desktop light/dark (same as shell). No app brand palette.
         try:
             sm = Adw.StyleManager.get_default()
             sm.connect("notify::dark", self._on_theme)
@@ -136,13 +136,7 @@ class WebTranscriptView(Gtk.Box):
         self._apply_theme(sm.get_dark())
 
     def set_theme_dark(self, dark: bool) -> None:
-        """Apply transcript palette; safe to call before/after page ready."""
         self.post({"type": "theme_changed", "theme": "dark" if dark else "light"})
-        try:
-            self.queue_resize()
-            self._view.queue_resize()
-        except Exception:  # noqa: BLE001
-            pass
 
     def _apply_theme(self, dark: bool) -> None:
         self.set_theme_dark(dark)

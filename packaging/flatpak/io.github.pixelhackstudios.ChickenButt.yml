@@ -25,10 +25,8 @@ finish-args:
   - --socket=session-bus
   - --talk-name=org.kde.StatusNotifierWatcher
   - --own-name=org.kde.StatusNotifierItem.*
-  # Appearance: Flatpak docs (Desktop Integration → Theming / Appearance
-  # Settings). Host /usr themes cannot be mounted (sandbox /usr is the
-  # runtime). color-scheme is via the Settings portal (session-bus above).
-  # libadwaita does not use host Yaru GTK CSS; it follows the portal.
+  # Appearance: session-bus → Settings portal → libadwaita light/dark.
+  # No custom theme, no GTK_THEME, no host theme mounts.
 
 cleanup:
   - /include

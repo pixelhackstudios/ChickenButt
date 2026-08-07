@@ -95,7 +95,7 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
         pass
 
 
-# Layout CSS via Adw.Application GResource. Appearance = system light/dark only.
+# Layout CSS via Adw GResource. Appearance = desktop light/dark only.
 
 GREETING_TEXT = "What's up, ChickenButt?"
 GREETING_SUB = (
