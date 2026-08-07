@@ -195,6 +195,15 @@ APP_CSS = b"""
     opacity: 0.55;
 }
 
+/* native reasoning panel */
+.reasoning-expander {
+    margin: 0 0 8px 0;
+    padding: 4px 0;
+}
+.reasoning-body {
+    padding: 4px 12px 12px 12px;
+}
+
 /* ---- sidebar model selection (above Recent) ---- */
 .chat-sidebar-model-block {
     border-bottom: 1px solid alpha(@window_fg_color, 0.08);

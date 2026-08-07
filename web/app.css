@@ -166,7 +166,7 @@ body.theme-light {
 /* Reasoning is a sibling of answer content (never merged into .md-body) */
 .reasoning {
   margin: 0 0 10px 0;
-  padding: 0;
+  padding: 4px 0 2px 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
@@ -183,7 +183,7 @@ body.theme-light .reasoning {
 .reasoning-summary {
   cursor: pointer;
   user-select: none;
-  padding: 8px 12px;
+  padding: 10px 16px 8px 16px;
   font-weight: 600;
   list-style: none;
 }
@@ -194,7 +194,7 @@ body.theme-light .reasoning {
 
 .reasoning-body {
   margin: 0;
-  padding: 0 12px 10px 12px;
+  padding: 4px 16px 14px 16px;
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: anywhere;
