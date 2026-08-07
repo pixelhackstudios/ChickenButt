@@ -138,6 +138,13 @@ class ConversationLifecycleController:
                 return message.get("content") or fallback
         return fallback
 
+    def message_thinking(self, message_id: str, fallback: str = "") -> str:
+        """Look up in-memory reasoning text by message id."""
+        for message in self._messages:
+            if message.get("id") == message_id:
+                return message.get("thinking") or fallback
+        return fallback
+
     def active_conversation_model(self) -> str | None:
         """Provide the active conversation's stored model preference."""
         if not self._conversation_id:
@@ -369,13 +376,17 @@ class ConversationLifecycleController:
             for m in stored
             if not self._is_ephemeral_greeting(m.role, m.content)
         ]
-        self._messages = [
-            {"id": m.id, "role": m.role, "content": m.content} for m in real
-        ]
+        def _msg_dict(m) -> dict:
+            return {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "thinking": getattr(m, "thinking", None) or "",
+            }
+
+        self._messages = [_msg_dict(m) for m in real]
         self._history_restored = bool(real)
-        payload = [
-            {"id": m.id, "role": m.role, "content": m.content} for m in real
-        ]
+        payload = [_msg_dict(m) for m in real]
         if real:
             self._apply_restored_transcript(payload)
         else:
@@ -437,17 +448,16 @@ class ConversationLifecycleController:
                 self._history_restored = False
                 self._messages = []
                 return
-            payload = [
-                {
+            def _msg_dict(m) -> dict:
+                return {
                     "id": m.id,
                     "role": m.role,
                     "content": m.content,
+                    "thinking": getattr(m, "thinking", None) or "",
                 }
-                for m in real
-            ]
-            self._messages = [
-                {"id": m.id, "role": m.role, "content": m.content} for m in real
-            ]
+
+            payload = [_msg_dict(m) for m in real]
+            self._messages = [_msg_dict(m) for m in real]
             self._history_restored = True
             if conv.model:
                 self._save_last_model(conv.model)

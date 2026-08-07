@@ -308,6 +308,45 @@ def test_stream_on_done_and_cancel(r: Results) -> None:
     r.check("live keep_alive top-level", body.get("keep_alive") == "10m")
     r.check("live think top-level", body.get("think") is False)
 
+
+def test_stream_thinking_callback(r: Results) -> None:
+    print("\n[3b] Stream captures message.thinking via on_thinking", flush=True)
+    chunks = [
+        {"message": {"thinking": "step ", "content": ""}, "done": False},
+        {"message": {"thinking": "two", "content": ""}, "done": False},
+        {"message": {"thinking": "", "content": "Answer"}, "done": False},
+        {"message": {"content": ""}, "done": True, "eval_count": 1},
+    ]
+    stub = CapturingStub(chunks=chunks)
+    stub.start()
+    client = OllamaClient(base_url=stub.base_url, timeout=5.0)
+    thinking: list[str] = []
+    pieces = list(
+        client.chat_stream(
+            "m",
+            [{"role": "user", "content": "x"}],
+            think=True,
+            on_thinking=thinking.append,
+        )
+    )
+    r.check("content yields answer only", pieces == ["Answer"], str(pieces))
+    r.check(
+        "thinking pieces collected",
+        thinking == ["step ", "two"],
+        str(thinking),
+    )
+    stub.close()
+
+    # Content-only stream must not require on_thinking
+    stub2 = CapturingStub()
+    stub2.start()
+    client2 = OllamaClient(base_url=stub2.base_url, timeout=5.0)
+    pieces2 = list(
+        client2.chat_stream("m", [{"role": "user", "content": "x"}])
+    )
+    r.check("content-only still works without callback", pieces2 == ["hi"], str(pieces2))
+    stub2.close()
+
     # Bare body over the wire
     stub2 = CapturingStub(
         chunks=[
@@ -559,6 +598,7 @@ def main() -> int:
         test_settings_compat(r, s1)
         test_request_body_shapes(r)
         test_stream_on_done_and_cancel(r)
+        test_stream_thinking_callback(r)
         test_metrics_safe(r)
         p1 = root / "prof"
         p1.mkdir()

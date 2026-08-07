@@ -3289,8 +3289,7 @@ def characterize_transcript_reset_replay_removal(
         "retained transcript entrypoints are explicit owner delegators",
         "Compatibility delegator for retained transcript consumers and tests."
         in (ChatSidebar._render_empty_transcript.__doc__ or "")
-        and "Compatibility delegator for retained transcript consumers and tests."
-        in (ChatSidebar._apply_restored_transcript.__doc__ or "")
+        and "Replay messages" in (ChatSidebar._apply_restored_transcript.__doc__ or "")
         and not hasattr(ChatSidebar, "_append_message")
         and not hasattr(ChatSidebar, "_native_remove_message")
         and not hasattr(ChatSidebar, "_native_action_bar")
@@ -4068,6 +4067,7 @@ def characterize_streaming_and_native_intent(
             "role": "assistant",
             "text": "",
             "streaming": True,
+            "thinking": "",
         }
         and web_events[0]["id"].startswith("asst-")
         and {"type": "message_delta", "id": web_events[0]["id"], "text": "Hello"}
@@ -4077,6 +4077,7 @@ def characterize_streaming_and_native_intent(
             "type": "message_done",
             "id": web_events[0]["id"],
             "text": "Hello",
+            "thinking": "",
         }
         and web_owner._commit_calls[-1][0] == web_events[0]["id"]
         and web_owner._commit_calls[-1][1] == "Hello",
@@ -4099,12 +4100,15 @@ def characterize_streaming_and_native_intent(
             "id": "asst-replace",
             "streaming": True,
             "text": "",
+            "thinking": "",
+            "clear_thinking": True,
         }
         and web_events[-1]
         == {
             "type": "message_done",
             "id": "asst-replace",
             "text": "Replaced",
+            "thinking": "",
         },
     )
 
@@ -4126,12 +4130,15 @@ def characterize_streaming_and_native_intent(
             "id": "asst-continue",
             "streaming": True,
             "text": "Seed\n\n",
+            "thinking": "",
+            "clear_thinking": False,
         }
         and web_events[-1]
         == {
             "type": "message_done",
             "id": "asst-continue",
             "text": "Seed\n\n more",
+            "thinking": "",
         },
     )
 
@@ -4145,6 +4152,7 @@ def characterize_streaming_and_native_intent(
             "type": "message_done",
             "id": web_events[0]["id"],
             "text": "(no response)",
+            "thinking": "",
         }
         and web_owner._commit_calls[-1][1] == "",
     )
@@ -4165,6 +4173,7 @@ def characterize_streaming_and_native_intent(
             "type": "message_error",
             "id": web_events[0]["id"],
             "text": "Partial\n\n[Error: boom]",
+            "thinking": "",
         }
         and web_owner._commit_calls[-1][2].get("allow_empty") is True
         and web_owner._commit_calls[-1][1] == "Partial",
@@ -4186,6 +4195,7 @@ def characterize_streaming_and_native_intent(
             "type": "message_error",
             "id": web_events[0]["id"],
             "text": "Error: empty-fail",
+            "thinking": "",
         },
     )
 
@@ -7560,12 +7570,13 @@ def characterize_message_actions(
                     "id": asst_live,
                     "role": "assistant",
                     "content": "brand new",
+                    "thinking": "",
                 },
             ]
-            and [(m.id, m.role, m.content) for m in persisted]
+            and [(m.id, m.role, m.content, m.thinking) for m in persisted]
             == [
-                (user_live, "user", "hi"),
-                (asst_live, "assistant", "brand new"),
+                (user_live, "user", "hi", ""),
+                (asst_live, "assistant", "brand new", ""),
             ]
             and not live._streaming,
         )
@@ -7603,12 +7614,13 @@ def characterize_message_actions(
                     "id": asst_cont,
                     "role": "assistant",
                     "content": "Seed text\n\n more",
+                    "thinking": "",
                 },
             ]
-            and [(m.id, m.role, m.content) for m in persisted]
+            and [(m.id, m.role, m.content, m.thinking) for m in persisted]
             == [
-                (user_cont, "user", "hi"),
-                (asst_cont, "assistant", "Seed text\n\n more"),
+                (user_cont, "user", "hi", ""),
+                (asst_cont, "assistant", "Seed text\n\n more", ""),
             ]
             and not live._streaming,
         )

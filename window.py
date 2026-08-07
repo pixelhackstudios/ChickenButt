@@ -195,6 +195,15 @@ APP_CSS = b"""
     opacity: 0.55;
 }
 
+/* native reasoning panel */
+.reasoning-expander {
+    margin: 0 0 8px 0;
+    padding: 4px 0;
+}
+.reasoning-body {
+    padding: 4px 12px 12px 12px;
+}
+
 /* ---- sidebar model selection (above Recent) ---- */
 .chat-sidebar-model-block {
     border-bottom: 1px solid alpha(@window_fg_color, 0.08);
@@ -1291,9 +1300,23 @@ class ChatSidebar(Adw.ApplicationWindow):
         """Compatibility delegator for retained transcript consumers and tests."""
         self._transcript.render_empty()
 
-    def _apply_restored_transcript(self, messages: list[dict[str, str]]) -> None:
-        """Compatibility delegator for retained transcript consumers and tests."""
-        self._transcript.replay(messages)
+    def _apply_restored_transcript(self, messages: list[dict]) -> None:
+        """Replay messages; paint thinking only when Show reasoning is on."""
+        show = False
+        model = getattr(self, "_model", None)
+        try:
+            if model:
+                params = self._model_profiles.request_params(model)
+                show = params.think is True
+        except Exception:  # noqa: BLE001
+            show = False
+        display: list[dict] = []
+        for m in messages:
+            row = dict(m)
+            if not show and "thinking" in row:
+                row["thinking"] = ""
+            display.append(row)
+        self._transcript.replay(display)
 
     def _select_active_history_row(self) -> None:
         """Compatibility delegator retained for Phase-17 tests."""

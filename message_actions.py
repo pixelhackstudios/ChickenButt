@@ -62,13 +62,24 @@ class MessageActionController:
 
     def api_messages(
         self, messages: list[dict] | None = None
-    ) -> list[dict[str, str]]:
+    ) -> list[dict]:
+        """Build Ollama chat history. Include non-empty thinking on assistants."""
         src = messages if messages is not None else self._conversation.messages
-        return [
-            {"role": m["role"], "content": m["content"]}
-            for m in src
-            if m.get("role") in ("user", "assistant") and m.get("content") is not None
-        ]
+        out: list[dict] = []
+        for m in src:
+            if m.get("role") not in ("user", "assistant"):
+                continue
+            if m.get("content") is None and not (m.get("thinking") or ""):
+                continue
+            row: dict = {
+                "role": m["role"],
+                "content": m.get("content") if m.get("content") is not None else "",
+            }
+            thinking = (m.get("thinking") or "").strip()
+            if m.get("role") == "assistant" and thinking:
+                row["thinking"] = m.get("thinking") or ""
+            out.append(row)
+        return out
 
     def clipboard_set(self, text: str) -> None:
         display = Gdk.Display.get_default()

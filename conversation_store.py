@@ -15,7 +15,7 @@ from typing import Any
 
 from gi.repository import GLib
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def default_db_path() -> Path:
@@ -46,6 +46,7 @@ class StoredMessage:
     content: str
     created_at: float
     seq: int
+    thinking: str = ""
 
 
 class ConversationStore:
@@ -91,6 +92,7 @@ class ConversationStore:
                     REFERENCES conversations(id) ON DELETE CASCADE,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                thinking TEXT NOT NULL DEFAULT '',
                 created_at REAL NOT NULL,
                 seq INTEGER NOT NULL,
                 UNIQUE (conversation_id, seq)
@@ -103,12 +105,42 @@ class ConversationStore:
                 ON conversations(updated_at DESC);
             """
         )
+        def _ensure_thinking_column() -> None:
+            cols = {
+                r[1]
+                for r in cur.execute("PRAGMA table_info(messages)").fetchall()
+            }
+            if "thinking" not in cols:
+                cur.execute(
+                    "ALTER TABLE messages "
+                    "ADD COLUMN thinking TEXT NOT NULL DEFAULT ''"
+                )
+
         row = cur.execute(
             "SELECT value FROM meta WHERE key = 'schema_version'"
         ).fetchone()
         if row is None:
+            # Do not assume fresh: an old messages table may predate meta.
+            _ensure_thinking_column()
             cur.execute(
                 "INSERT INTO meta(key, value) VALUES ('schema_version', ?)",
+                (str(SCHEMA_VERSION),),
+            )
+            return
+        try:
+            version = int(str(row["value"]))
+        except (TypeError, ValueError):
+            version = 1
+        if version < 2:
+            # Pre-thinking installs used CREATE without the column.
+            _ensure_thinking_column()
+            cur.execute(
+                "UPDATE meta SET value = ? WHERE key = 'schema_version'",
+                (str(SCHEMA_VERSION),),
+            )
+        elif version < SCHEMA_VERSION:
+            cur.execute(
+                "UPDATE meta SET value = ? WHERE key = 'schema_version'",
                 (str(SCHEMA_VERSION),),
             )
 
@@ -315,6 +347,7 @@ class ConversationStore:
                     "id": m.id,
                     "role": m.role,
                     "content": m.content,
+                    "thinking": m.thinking or "",
                     "created_at": m.created_at,
                     "seq": m.seq,
                 }
@@ -343,6 +376,11 @@ class ConversationStore:
             heading = "You" if role == "user" else "Assistant"
             lines.append(f"## {heading}")
             lines.append("")
+            if (m.thinking or "").strip():
+                lines.append("### Reasoning")
+                lines.append("")
+                lines.append((m.thinking or "").rstrip())
+                lines.append("")
             lines.append((m.content or "").rstrip())
             lines.append("")
         return "\n".join(lines).rstrip() + "\n"
@@ -370,6 +408,12 @@ class ConversationStore:
         ).fetchone()
         return int(row["m"]) + 1
 
+    def _row_thinking(self, row: sqlite3.Row) -> str:
+        try:
+            return str(row["thinking"] or "")
+        except (IndexError, KeyError):
+            return ""
+
     def append_message(
         self,
         conversation_id: str,
@@ -378,18 +422,22 @@ class ConversationStore:
         content: str,
         message_id: str | None = None,
         created_at: float | None = None,
+        thinking: str = "",
     ) -> StoredMessage:
         mid = message_id or self._new_id("msg")
         ts = created_at if created_at is not None else self._now()
         seq = self.next_seq(conversation_id)
+        think = thinking or ""
         self._conn.execute("BEGIN")
         try:
             self._conn.execute(
                 """
-                INSERT INTO messages(id, conversation_id, role, content, created_at, seq)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO messages(
+                    id, conversation_id, role, content, thinking, created_at, seq
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (mid, conversation_id, role, content, ts, seq),
+                (mid, conversation_id, role, content, think, ts, seq),
             )
             # Title from first user line if empty
             if role == "user":
@@ -418,6 +466,7 @@ class ConversationStore:
             content=content,
             created_at=ts,
             seq=seq,
+            thinking=think,
         )
 
     def list_messages(self, conversation_id: str) -> list[StoredMessage]:
@@ -437,6 +486,7 @@ class ConversationStore:
                 content=r["content"],
                 created_at=float(r["created_at"]),
                 seq=int(r["seq"]),
+                thinking=self._row_thinking(r),
             )
             for r in rows
         ]
@@ -454,8 +504,14 @@ class ConversationStore:
         if cid:
             self.touch(cid)
 
-    def update_message(self, message_id: str, content: str) -> None:
-        """Replace raw content of an existing message (regenerate / continue)."""
+    def update_message(
+        self,
+        message_id: str,
+        content: str,
+        *,
+        thinking: str | None = None,
+    ) -> None:
+        """Replace content (and optionally thinking) of an existing message."""
         ts = self._now()
         self._conn.execute("BEGIN")
         try:
@@ -467,14 +523,24 @@ class ConversationStore:
                 self._conn.execute("ROLLBACK")
                 raise KeyError(f"message not found: {message_id}")
             cid = row["conversation_id"]
-            self._conn.execute(
-                """
-                UPDATE messages
-                SET content = ?, created_at = created_at
-                WHERE id = ?
-                """,
-                (content, message_id),
-            )
+            if thinking is not None:
+                self._conn.execute(
+                    """
+                    UPDATE messages
+                    SET content = ?, thinking = ?, created_at = created_at
+                    WHERE id = ?
+                    """,
+                    (content, thinking or "", message_id),
+                )
+            else:
+                self._conn.execute(
+                    """
+                    UPDATE messages
+                    SET content = ?, created_at = created_at
+                    WHERE id = ?
+                    """,
+                    (content, message_id),
+                )
             self._conn.execute(
                 "UPDATE conversations SET updated_at = ? WHERE id = ?",
                 (ts, cid),
@@ -497,6 +563,7 @@ class ConversationStore:
             content=row["content"],
             created_at=float(row["created_at"]),
             seq=int(row["seq"]),
+            thinking=self._row_thinking(row),
         )
 
     def clear_messages(self, conversation_id: str) -> None:

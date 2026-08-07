@@ -48,7 +48,7 @@ class RunningModelInfo:
 
 def build_chat_body(
     model: str,
-    messages: list[dict[str, str]],
+    messages: list[dict[str, Any]],
     *,
     stream: bool = True,
     options: dict[str, Any] | None = None,
@@ -414,13 +414,14 @@ class OllamaClient:
     def chat_stream(
         self,
         model: str,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         *,
         cancel_event: threading.Event | None = None,
         options: dict[str, Any] | None = None,
         keep_alive: Any = None,
         think: Any = None,
         on_done: Callable[[dict[str, Any]], None] | None = None,
+        on_thinking: Callable[[str], None] | None = None,
     ) -> Iterator[str]:
         """Stream a chat completion.
 
@@ -430,10 +431,11 @@ class OllamaClient:
         model to produce another token. Normal generation gets no socket
         timeout — a model that pauses for a long time is not an error.
 
-        Content chunks still yield as strings. When a final ``done`` object
-        arrives, ``on_done`` is invoked once with that object (if provided).
-        Cancellation or connection loss without a ``done`` chunk does not
-        call ``on_done``.
+        Content chunks still yield as strings. Non-empty ``message.thinking``
+        pieces invoke ``on_thinking`` when provided (never merged into yields).
+        When a final ``done`` object arrives, ``on_done`` is invoked once with
+        that object (if provided). Cancellation or connection loss without a
+        ``done`` chunk does not call ``on_done``.
         """
         parsed = urllib.parse.urlsplit(self.base_url)
         conn_cls = (
@@ -544,6 +546,15 @@ class OllamaClient:
                 if err := chunk.get("error"):
                     raise OllamaError(str(err))
                 msg = chunk.get("message") or {}
+                if not isinstance(msg, dict):
+                    msg = {}
+                thinking = msg.get("thinking") or ""
+                if thinking and on_thinking is not None:
+                    try:
+                        on_thinking(str(thinking))
+                    except Exception:  # noqa: BLE001
+                        # Thinking UI/metrics must never break generation.
+                        pass
                 content = msg.get("content") or ""
                 if content:
                     yield content

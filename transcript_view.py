@@ -265,15 +265,17 @@ class WebTranscriptView(Gtk.Box):
             except Exception as exc:  # noqa: BLE001
                 print(f"evaluate_javascript failed: {exc}", flush=True)
 
-    def reset(self, messages: list[dict[str, str]] | None = None) -> None:
+    def reset(self, messages: list[dict] | None = None) -> None:
         payload_messages = []
         if messages:
             for i, m in enumerate(messages):
-                payload_messages.append(
-                    {
-                        "id": m.get("id") or f"hist-{i}",
-                        "role": m.get("role", "assistant"),
-                        "content": m.get("content", ""),
-                    }
-                )
+                row = {
+                    "id": m.get("id") or f"hist-{i}",
+                    "role": m.get("role", "assistant"),
+                    "content": m.get("content", ""),
+                }
+                thinking = m.get("thinking") or ""
+                if thinking:
+                    row["thinking"] = thinking
+                payload_messages.append(row)
         self.post({"type": "conversation_reset", "messages": payload_messages})
