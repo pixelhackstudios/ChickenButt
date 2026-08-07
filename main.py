@@ -11,29 +11,6 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-
-def _prepare_flatpak_gtk_theme() -> None:
-    """Avoid host GTK theme names that have no CSS inside org.gnome.Platform.
-
-    Ubuntu often exports GTK_THEME=Yaru-dark (or the portal reports Yaru).
-    Yaru's gtk-4.0/gtk.css is a gresource import that is **not** in the
-    GNOME Flatpak runtime, which prints:
-
-        Failed to import resource:///com/ubuntu/themes/Yaru-dark/4.0/gtk.css
-
-    Force Adwaita under Flatpak (always overwrite host/portal Yaru names).
-    libadwaita still follows the desktop color-scheme for light/dark.
-    """
-    if not os.environ.get("FLATPAK_ID"):
-        return
-    # Host env and portals routinely inject Yaru-*; do not "honor" that —
-    # those themes are not available in the sandbox.
-    os.environ["GTK_THEME"] = "Adwaita"
-
-
-# Must run before Gtk/Adw are loaded so the theme name is fixed early.
-_prepare_flatpak_gtk_theme()
-
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -51,6 +28,11 @@ from window import ChatSidebar
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        # Follow desktop light/dark; ChickenButt CSS owns chrome branding.
+        try:
+            Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)
+        except Exception:  # noqa: BLE001
+            pass
         self.window: ChatSidebar | None = None
         self.tray: TrayIcon | None = None
         self.connect("activate", self._on_activate)

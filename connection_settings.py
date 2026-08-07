@@ -65,18 +65,29 @@ def _ensure_preferences_css() -> None:
     provider = Gtk.CssProvider()
     provider.load_from_string(
         """
-        /* Full-column settings page (Connection · Model · Model Fit).
-           Background follows Adwaita so light/dark stay coherent. */
+        /* Full-column settings page — brand surfaces (match shell / transcript) */
         .chickenbutt-settings-panel {
-            background-color: @window_bg_color;
+            background-color: #121216;
+            color: #e8e8ed;
         }
         .chickenbutt-settings-panel headerbar {
             padding-top: 10px;
             padding-bottom: 8px;
-            background-color: @window_bg_color;
+            background-color: #121216;
+            color: #e8e8ed;
         }
         .chickenbutt-settings-panel adw-view-switcher {
             margin-top: 2px;
+        }
+        @media (prefers-color-scheme: light) {
+            .chickenbutt-settings-panel {
+                background-color: #f4f4f6;
+                color: #1c1c1e;
+            }
+            .chickenbutt-settings-panel headerbar {
+                background-color: #f4f4f6;
+                color: #1c1c1e;
+            }
         }
         """
     )

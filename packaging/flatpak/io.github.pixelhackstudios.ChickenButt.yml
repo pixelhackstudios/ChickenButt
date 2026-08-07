@@ -25,9 +25,6 @@ finish-args:
   - --socket=session-bus
   - --talk-name=org.kde.StatusNotifierWatcher
   - --own-name=org.kde.StatusNotifierItem.*
-  # Do not inherit host GTK_THEME=Yaru-* (missing gresource in the runtime).
-  # libadwaita still follows system light/dark via color-scheme.
-  - --env=GTK_THEME=Adwaita
 
 cleanup:
   - /include

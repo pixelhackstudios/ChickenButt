@@ -124,19 +124,22 @@ No listening server in ChickenButt.
 | `--own-name=org.kde.StatusNotifierItem.*` | Tray item name ownership |
 
 **Not granted by default:** home filesystem, full device access, system bus, pulseaudio,
-host theme trees (`~/.themes`, `/usr/share/themes`), or `GTK_THEME` pointing at host Yaru.
+host theme trees (`~/.themes`, `/usr/share/themes`).
 
 ### Theming / light–dark (Flatpak)
 
-ChickenButt **follows the desktop color-scheme** (prefer-dark / prefer-light) via
-libadwaita `StyleManager` and the WebKit transcript theme bridge. It does **not**
-grant host theme filesystem access and does not copy host `gtk-4.0/gtk.css`.
+ChickenButt **owns its look**. The system supplies light/dark (color-scheme);
+application CSS and the WebKit transcript define brand surfaces. We do **not**
+grant host theme filesystem access, copy host `gtk-4.0/gtk.css`, or pin
+`GTK_THEME=Adwaita` as product identity.
 
-Host theme names such as `Yaru-dark` often arrive via the host environment and
-the settings portal; their gresources are not in `org.gnome.Platform`. The
-manifest sets `--env=GTK_THEME=Adwaita`, the `chickenbutt` launcher forces the
-same when `FLATPAK_ID` is set, and `main.py` forces Adwaita before Gtk loads
-(overwriting host Yaru). Light/dark still track the system color-scheme.
+There is no GTK4 Flatpak theme extension point for Yaru; Ubuntu’s Yaru/libadwaita
+patches are not in `org.gnome.Platform`. Host `Yaru-*` may still emit import
+warnings if the portal advertises them — that is secondary to brand CSS.
+
+`Adw.StyleManager` uses `COLOR_SCHEME_DEFAULT`. WebKit receives `theme_changed`
+from the same dark/light signal. Native chrome uses ChickenButt `APP_CSS`
+(brand backgrounds and accent matching the transcript), not stock desktop chrome.
 
 ## Architecture
 

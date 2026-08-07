@@ -96,10 +96,66 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
 
 
 APP_CSS = b"""
-/* ---- chat surface (solid; tracks Adwaita light/dark) ---- */
-/* Prefer @window_bg_color so light is never stuck on the dark Grok tint. */
+/* ============================================================
+   ChickenButt shell branding
+   System supplies light/dark (prefers-color-scheme). ChickenButt
+   owns chrome colors so Flatpak/host theme engines do not define
+   the product look (no stock-Adwaita identity, no host Yaru).
+   ============================================================ */
+.chickenbutt-shell {
+    background-color: #121216;
+    color: #e8e8ed;
+}
+.chickenbutt-shell headerbar {
+    background-color: #121216;
+    color: #e8e8ed;
+    box-shadow: none;
+    border-bottom: 1px solid alpha(#ffffff, 0.08);
+}
+.chickenbutt-shell .top-bar,
+.chickenbutt-shell toolbar {
+    background-color: #121216;
+    color: #e8e8ed;
+}
+/* Brand accent (matches web --accent) */
+.chickenbutt-shell .suggested-action,
+.chickenbutt-shell .send-btn.suggested-action {
+    background-color: #c9a227;
+    color: #1a1a12;
+    border-radius: 999px;
+}
+.chickenbutt-shell .suggested-action:hover,
+.chickenbutt-shell .send-btn.suggested-action:hover {
+    background-color: #d4af37;
+}
+
+@media (prefers-color-scheme: light) {
+    .chickenbutt-shell {
+        background-color: #f4f4f6;
+        color: #1c1c1e;
+    }
+    .chickenbutt-shell headerbar {
+        background-color: #f4f4f6;
+        color: #1c1c1e;
+        border-bottom: 1px solid alpha(#000000, 0.08);
+    }
+    .chickenbutt-shell .top-bar,
+    .chickenbutt-shell toolbar {
+        background-color: #f4f4f6;
+        color: #1c1c1e;
+    }
+}
+
+/* ---- chat surface (matches WebKit --bg) ---- */
 .chat-surface {
-    background-color: @window_bg_color;
+    background-color: #121216;
+    color: #e8e8ed;
+}
+@media (prefers-color-scheme: light) {
+    .chat-surface {
+        background-color: #f4f4f6;
+        color: #1c1c1e;
+    }
 }
 .chat-list {
     background: transparent;
@@ -340,15 +396,28 @@ APP_CSS = b"""
     min-width: 220px;
 }
 
-/* ---- docked chat history rail (GNOME-style, no modal overlay) ---- */
+/* ---- docked chat history rail ---- */
 .chat-sidebar {
-    background-color: alpha(@window_fg_color, 0.03);
-    border-right: 1px solid alpha(@window_fg_color, 0.10);
+    background-color: #16161c;
+    border-right: 1px solid alpha(#ffffff, 0.10);
+    color: #e8e8ed;
+}
+@media (prefers-color-scheme: light) {
+    .chat-sidebar {
+        background-color: #ececf0;
+        border-right: 1px solid alpha(#000000, 0.10);
+        color: #1c1c1e;
+    }
 }
 .chat-sidebar-header {
     padding: 6px 8px 6px 12px;
     min-height: 40px;
-    border-bottom: 1px solid alpha(@window_fg_color, 0.08);
+    border-bottom: 1px solid alpha(#ffffff, 0.08);
+}
+@media (prefers-color-scheme: light) {
+    .chat-sidebar-header {
+        border-bottom: 1px solid alpha(#000000, 0.08);
+    }
 }
 .chat-sidebar-title {
     font-weight: 700;
@@ -363,8 +432,13 @@ APP_CSS = b"""
 }
 .chat-sidebar-footer {
     padding: 6px 8px;
-    border-top: 1px solid alpha(@window_fg_color, 0.08);
+    border-top: 1px solid alpha(#ffffff, 0.08);
     min-height: 40px;
+}
+@media (prefers-color-scheme: light) {
+    .chat-sidebar-footer {
+        border-top: 1px solid alpha(#000000, 0.08);
+    }
 }
 .chat-sidebar list {
     background: transparent;
@@ -379,7 +453,7 @@ APP_CSS = b"""
     background-color: alpha(@window_fg_color, 0.06);
 }
 .chat-sidebar row:selected {
-    background-color: alpha(@accent_bg_color, 0.20);
+    background-color: alpha(#c9a227, 0.22);
 }
 .chat-sidebar-row-title {
     font-weight: 500;
@@ -451,6 +525,7 @@ def _is_ephemeral_greeting(role: str, content: str) -> bool:
 class ChatSidebar(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, client: OllamaClient | None = None):
         super().__init__(application=app, title="ChickenButt")
+        self.add_css_class("chickenbutt-shell")
         self._model_profiles = ModelProfileService(
             settings_dir=_SETTINGS_DIR,
             settings_path=_SETTINGS_PATH,
