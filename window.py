@@ -97,9 +97,10 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
 
 APP_CSS = b"""
 /* ============================================================
-   ChickenButt owns its palette. Python sets .chickenbutt-dark or
-   .chickenbutt-light on the window from StyleManager.get_dark().
-   No @media (prefers-color-scheme); no CssProvider scheme sync.
+   Shell chrome uses libadwaita named colors so light/dark flips
+   with StyleManager (same path as other GNOME-runtime apps).
+   Brand bits only: gold accent (matches web --accent).
+   WebKit transcript has its own palette via theme_changed.
    ============================================================ */
 
 /* Brand accent (matches web --accent) */
@@ -118,82 +119,29 @@ APP_CSS = b"""
     color: #1a1a12;
 }
 
-/* ---- DARK ---- */
-.chickenbutt-dark {
-    background-color: #121216;
-    color: #e8e8ed;
+/* Surfaces: token-based so dark/light is automatic */
+.chat-surface {
+    background-color: @window_bg_color;
+    color: @window_fg_color;
 }
-.chickenbutt-dark headerbar,
-.chickenbutt-dark .top-bar,
-.chickenbutt-dark toolbar {
-    background-color: #121216;
-    color: #e8e8ed;
-    box-shadow: none;
+.chat-sidebar {
+    background-color: @sidebar_bg_color;
+    border-right: 1px solid alpha(@window_fg_color, 0.10);
+    color: @window_fg_color;
 }
-.chickenbutt-dark headerbar {
-    border-bottom: 1px solid alpha(#ffffff, 0.08);
+.chat-sidebar-header {
+    border-bottom: 1px solid alpha(@window_fg_color, 0.08);
 }
-.chickenbutt-dark .chat-surface {
-    background-color: #121216;
-    color: #e8e8ed;
+.chat-sidebar-footer {
+    border-top: 1px solid alpha(@window_fg_color, 0.08);
 }
-.chickenbutt-dark .chat-sidebar {
-    background-color: #16161c;
-    border-right: 1px solid alpha(#ffffff, 0.10);
-    color: #e8e8ed;
+.chat-sidebar-model-block {
+    border-bottom: 1px solid alpha(@window_fg_color, 0.08);
 }
-.chickenbutt-dark .chat-sidebar-header {
-    border-bottom: 1px solid alpha(#ffffff, 0.08);
-}
-.chickenbutt-dark .chat-sidebar-footer {
-    border-top: 1px solid alpha(#ffffff, 0.08);
-}
-.chickenbutt-dark .chat-sidebar-model-block {
-    border-bottom: 1px solid alpha(#ffffff, 0.08);
-}
-.chickenbutt-dark .chickenbutt-settings-panel,
-.chickenbutt-dark .chickenbutt-settings-panel headerbar {
-    background-color: #121216;
-    color: #e8e8ed;
-}
-
-/* ---- LIGHT ---- */
-.chickenbutt-light {
-    background-color: #f4f4f6;
-    color: #1c1c1e;
-}
-.chickenbutt-light headerbar,
-.chickenbutt-light .top-bar,
-.chickenbutt-light toolbar {
-    background-color: #f4f4f6;
-    color: #1c1c1e;
-    box-shadow: none;
-}
-.chickenbutt-light headerbar {
-    border-bottom: 1px solid alpha(#000000, 0.08);
-}
-.chickenbutt-light .chat-surface {
-    background-color: #f4f4f6;
-    color: #1c1c1e;
-}
-.chickenbutt-light .chat-sidebar {
-    background-color: #ececf0;
-    border-right: 1px solid alpha(#000000, 0.10);
-    color: #1c1c1e;
-}
-.chickenbutt-light .chat-sidebar-header {
-    border-bottom: 1px solid alpha(#000000, 0.08);
-}
-.chickenbutt-light .chat-sidebar-footer {
-    border-top: 1px solid alpha(#000000, 0.08);
-}
-.chickenbutt-light .chat-sidebar-model-block {
-    border-bottom: 1px solid alpha(#000000, 0.08);
-}
-.chickenbutt-light .chickenbutt-settings-panel,
-.chickenbutt-light .chickenbutt-settings-panel headerbar {
-    background-color: #f4f4f6;
-    color: #1c1c1e;
+.chickenbutt-settings-panel,
+.chickenbutt-settings-panel headerbar {
+    background-color: @window_bg_color;
+    color: @window_fg_color;
 }
 
 .chat-list {
@@ -385,8 +333,8 @@ APP_CSS = b"""
     border-radius: 999px;
 }
 .send-btn.suggested-action {
-    background-color: @accent_bg_color;
-    color: @accent_fg_color;
+    background-color: #c9a227;
+    color: #1a1a12;
 }
 .stop-btn {
     min-width: 36px;
@@ -435,7 +383,7 @@ APP_CSS = b"""
     min-width: 220px;
 }
 
-/* ---- docked chat history rail (colors under .chickenbutt-dark/light) ---- */
+/* ---- docked chat history rail ---- */
 .chat-sidebar-header {
     padding: 6px 8px 6px 12px;
     min-height: 40px;
@@ -542,13 +490,6 @@ class ChatSidebar(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, client: OllamaClient | None = None):
         super().__init__(application=app, title="ChickenButt")
         self.add_css_class("chickenbutt-shell")
-        self._sync_appearance_classes()
-        try:
-            Adw.StyleManager.get_default().connect(
-                "notify::dark", lambda *_: self._sync_appearance_classes()
-            )
-        except Exception:  # noqa: BLE001
-            pass
         self._model_profiles = ModelProfileService(
             settings_dir=_SETTINGS_DIR,
             settings_path=_SETTINGS_PATH,
@@ -961,16 +902,6 @@ class ChatSidebar(Adw.ApplicationWindow):
             self.set_visible(False)
             return True
         return False
-
-    def _sync_appearance_classes(self) -> None:
-        """Apply chickenbutt-dark or chickenbutt-light from StyleManager."""
-        try:
-            dark = bool(Adw.StyleManager.get_default().get_dark())
-        except Exception:  # noqa: BLE001
-            dark = True
-        self.remove_css_class("chickenbutt-light")
-        self.remove_css_class("chickenbutt-dark")
-        self.add_css_class("chickenbutt-dark" if dark else "chickenbutt-light")
 
     def _install_css(self) -> None:
         css = Gtk.CssProvider()

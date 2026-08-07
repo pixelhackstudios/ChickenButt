@@ -11,6 +11,27 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
+
+def _prepare_flatpak_gtk_theme() -> None:
+    """Use a GTK theme that actually exists inside the Flatpak runtime.
+
+    Ubuntu hosts often inject GTK_THEME=Yaru-*. Yaru's GTK4 CSS is a gresource
+    that is **not** shipped in org.gnome.Platform, so theme load fails and
+    libadwaita color tokens (@window_bg_color, etc.) come out wrong — that is
+    the "borked light/dark" look, not a missing brand palette.
+
+    Adwaita here is sandbox availability only (same as other GNOME-runtime
+    Flatpaks). Product branding is accent CSS + the WebKit transcript, not
+    the base theme name. Light/dark still follows the desktop color-scheme.
+    """
+    if not os.environ.get("FLATPAK_ID"):
+        return
+    os.environ["GTK_THEME"] = "Adwaita"
+
+
+# Before Gtk/Adw import so the theme name is fixed before first style load.
+_prepare_flatpak_gtk_theme()
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -28,7 +49,7 @@ from window import ChatSidebar
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # Follow desktop light/dark; ChickenButt CSS owns chrome branding.
+        # System light/dark; libadwaita paints chrome from the active base theme.
         try:
             Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)
         except Exception:  # noqa: BLE001

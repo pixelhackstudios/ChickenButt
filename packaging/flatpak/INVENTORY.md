@@ -128,19 +128,21 @@ host theme trees (`~/.themes`, `/usr/share/themes`).
 
 ### Theming / light–dark (Flatpak)
 
-ChickenButt **owns its look**. The system supplies light/dark (color-scheme);
-application CSS and the WebKit transcript define brand surfaces. We do **not**
-grant host theme filesystem access, copy host `gtk-4.0/gtk.css`, or pin
-`GTK_THEME=Adwaita` as product identity.
+**What working GNOME-runtime Flatpaks do:** load a base theme that exists in
+the sandbox, follow the desktop color-scheme via libadwaita, style with named
+colors (`@window_bg_color`, etc.), brand only accents / custom surfaces.
 
-There is no GTK4 Flatpak theme extension point for Yaru; Ubuntu’s Yaru/libadwaita
-patches are not in `org.gnome.Platform`. Host `Yaru-*` may still emit import
-warnings if the portal advertises them — that is secondary to brand CSS.
+**What breaks on Ubuntu:** host/portal injects `GTK_THEME=Yaru-*`. Yaru GTK4
+CSS is a gresource **not** in `org.gnome.Platform`, so theme load fails and
+token colors are wrong. That is not fixed by dual custom light/dark CSS.
 
-`Adw.StyleManager` uses `COLOR_SCHEME_DEFAULT`. Python reads `get_dark()` and
-sets a window class `chickenbutt-dark` or `chickenbutt-light`; the same boolean
-drives WebKit `theme_changed`. No CSS media-query scheme sync on custom
-providers.
+**ChickenButt:**
+- `GTK_THEME=Adwaita` under Flatpak (manifest, launcher, `main.py` when
+  `FLATPAK_ID` is set) — sandbox theme availability, **not** product branding.
+- `Adw.StyleManager` `COLOR_SCHEME_DEFAULT` for system light/dark.
+- Shell CSS uses libadwaita tokens; gold accent + WebKit transcript own brand.
+- WebKit gets `theme_changed` from `StyleManager.get_dark()`.
+- No host theme mounts, no inventing a Yaru Flatpak theme extension.
 
 ## Architecture
 

@@ -60,8 +60,8 @@ _prefs_css_installed = False
 def _ensure_preferences_css() -> None:
     """Spacing for the embedded settings panel (main-column content swap).
 
-    Colors live on the window under .chickenbutt-dark / .chickenbutt-light
-    (see window.APP_CSS). This provider only handles layout chrome.
+    Colors come from libadwaita tokens (see window.APP_CSS). This provider
+    only handles layout chrome.
     """
     global _prefs_css_installed
     if _prefs_css_installed:
