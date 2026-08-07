@@ -13,7 +13,8 @@
 ChickenButt is a native Linux desktop app for chatting with local AI models through [Ollama](https://ollama.com).
 
 **Website:** [https://www.chickenbutt.dev/](https://www.chickenbutt.dev/)  
-**Source:** [https://github.com/pixelhackstudios/ChickenButt](https://github.com/pixelhackstudios/ChickenButt)
+**Source:** [https://github.com/pixelhackstudios/ChickenButt](https://github.com/pixelhackstudios/ChickenButt)  
+**Releases:** [Download the latest release from GitHub Releases](https://github.com/pixelhackstudios/ChickenButt/releases/latest)
 
 It is built with GTK4 and libadwaita, designed to feel at home on GNOME, and focused on making local AI pleasant to use without turning the interface into an aircraft cockpit.
 
@@ -28,6 +29,9 @@ It is built with GTK4 and libadwaita, designed to feel at home on GNOME, and foc
 * Keeps multiple conversations in a local SQLite database
 * Renders Markdown, tables, links, and syntax-highlighted code
 * Lets you copy, expand, and collapse code blocks
+* Optional reasoning/thinking display for supported Ollama models (Show reasoning)
+* Per-model settings for connection, context, and response preferences
+* Model Fit diagnostics for how a model sits on your machine
 * Shows clear health information when Ollama is unavailable
 * Lists, inspects, and pulls models from the composer
 * Exports conversations as Markdown or JSON
@@ -45,60 +49,22 @@ It is built with GTK4 and libadwaita, designed to feel at home on GNOME, and foc
   </tr>
 </table>
 
-## Requirements
+## Install ChickenButt
 
-ChickenButt currently targets Linux.
+The easiest way to get ChickenButt is the Linux Flatpak from GitHub Releases.
 
-You will need:
-
-* Python 3.10 or newer
-* GTK4
-* libadwaita
-* WebKitGTK 6.0
-* PyGObject
-* dasbus
-* [Ollama](https://ollama.com) for running models
-
-These are mostly system packages, not Python packages installed through `pip`.
-
-See **[DEPENDENCIES.md](DEPENDENCIES.md)** for Fedora and Ubuntu installation commands, optional integrations, and explanations of what each dependency does.
-
-Check the current system without installing anything:
+1. Install [Ollama](https://ollama.com) on the host and make sure it is running (ChickenButt does not bundle Ollama or models).
+2. Download the latest `.flatpak` from **[GitHub Releases](https://github.com/pixelhackstudios/ChickenButt/releases/latest)**.
+3. Install and run:
 
 ```bash
-python3 scripts/check_dependencies.py
+flatpak install --user ./ChickenButt-*-x86_64.flatpak
+flatpak run io.github.pixelhackstudios.ChickenButt
 ```
 
-Include build tools in the check:
+Requires `flatpak` and a host Ollama service. The Flatpak ships its own GTK/runtime stack against `org.gnome.Platform`.
 
-```bash
-python3 scripts/check_dependencies.py --build
-```
-
-## Run from the source tree
-
-Clone the repository:
-
-```bash
-git clone https://github.com/pixelhackstudios/ChickenButt.git
-cd ChickenButt
-```
-
-Start ChickenButt:
-
-```bash
-./run.sh
-```
-
-This runs the app directly from the checkout without installing anything.
-
-To use the native GTK transcript renderer instead of the default WebKit renderer:
-
-```bash
-CHICKENBUTT_TRANSCRIPT=native ./run.sh
-```
-
-## Running Ollama
+### Running Ollama
 
 ChickenButt does not bundle Ollama or any AI models.
 
@@ -116,9 +82,30 @@ ollama list
 
 ChickenButt will still open when Ollama is unavailable. It will show health and onboarding information instead of simply crashing.
 
-## Install from source
+## Build from source
 
-ChickenButt uses Meson for local installation:
+### Development Flatpak
+
+Build and install a development Flatpak from a checkout (does not require host GTK packages):
+
+```bash
+# once: flatpak + flatpak-builder + GNOME Platform/SDK 50 from Flathub
+./scripts/build_flatpak.sh
+flatpak run io.github.pixelhackstudios.ChickenButt
+```
+
+Details, inventory, and sandbox justifications:
+
+* **[packaging/flatpak/README.md](packaging/flatpak/README.md)**
+* **[packaging/flatpak/INVENTORY.md](packaging/flatpak/INVENTORY.md)**
+
+Publishing to Flathub is a separate maintainer step and must follow current Flathub policy.
+
+### Meson install (host packages)
+
+ChickenButt uses Meson for a traditional host install. You will need Python 3.10+, GTK4, libadwaita, WebKitGTK 6.0, PyGObject, dasbus, and build tools.
+
+See **[DEPENDENCIES.md](DEPENDENCIES.md)** for Fedora and Ubuntu package names.
 
 ```bash
 python3 scripts/check_dependencies.py --build
@@ -133,61 +120,34 @@ Launch the installed app:
 chickenbutt
 ```
 
-The installation includes:
+Make sure `$HOME/.local/bin` is on your `PATH`. Rebuild with `meson setup --reconfigure build --prefix="$HOME/.local"` and `meson install -C build`. Uninstall with `ninja -C build uninstall` from the retained build directory.
 
-* The `chickenbutt` command
-* The application runtime
-* A desktop launcher
-* App icons
-* AppStream metadata is installed
+## Development
 
-Make sure this directory is on your `PATH`:
+### Run from the source tree
 
 ```bash
-$HOME/.local/bin
+git clone https://github.com/pixelhackstudios/ChickenButt.git
+cd ChickenButt
+./run.sh
 ```
 
-Add it when necessary:
+This runs the app directly from the checkout without installing anything.
+
+Native GTK transcript instead of WebKit:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+CHICKENBUTT_TRANSCRIPT=native ./run.sh
 ```
 
-To rebuild after pulling new changes:
+Check host dependencies without installing:
 
 ```bash
-meson setup --reconfigure build --prefix="$HOME/.local"
-meson install -C build
+python3 scripts/check_dependencies.py
+python3 scripts/check_dependencies.py --build
 ```
 
-To uninstall from the retained build directory:
-
-```bash
-ninja -C build uninstall
-```
-
-## Install as a Flatpak (development packaging)
-
-ChickenButt can be built as a Flatpak against `org.gnome.Platform` so the same
-app runs on any Flatpak-capable Linux distribution without host GTK packages.
-
-Requirements: `flatpak`, `flatpak-builder`, and a host [Ollama](https://ollama.com)
-service (not bundled). Details, inventory, and sandbox justifications:
-
-* **[packaging/flatpak/README.md](packaging/flatpak/README.md)**
-* **[packaging/flatpak/INVENTORY.md](packaging/flatpak/INVENTORY.md)**
-
-```bash
-# once: flatpak + flatpak-builder + GNOME Platform/SDK 50 from Flathub
-./scripts/build_flatpak.sh
-flatpak run io.github.pixelhackstudios.ChickenButt
-```
-
-This repository holds **development** Flatpak packaging. Publishing to Flathub
-is a separate step that must follow current Flathub policy (including
-human-authored submission materials).
-
-## Local data
+### Local data
 
 ChickenButt keeps its application data on your machine.
 
@@ -202,14 +162,14 @@ Override the conversation database location with:
 CHICKENBUTT_DB=/path/to/conversations.db ./run.sh
 ```
 
-## Repository layout
+### Repository layout
 
 ```text
 ChickenButt/
 ├── chickenbutt-web/   Project website source
 ├── data/              Desktop and AppStream metadata
 ├── icons/             Application icons
-├── packaging/         Installed launcher script
+├── packaging/         Installed launcher script and Flatpak packaging
 ├── scripts/           Tests, checks, and development tools
 ├── vendor/            Vendored Python dependencies
 ├── web/               Embedded transcript interface
@@ -221,7 +181,7 @@ The two web directories serve different purposes:
 * `web/` is part of the desktop application and renders conversations inside WebKit.
 * `chickenbutt-web/` is the public project website built with React and Vite.
 
-## Website development
+### Website development
 
 The project website lives in `chickenbutt-web/`.
 
@@ -239,11 +199,11 @@ npm run build
 
 Generated `node_modules/` and `dist/` directories are intentionally excluded from Git.
 
-## Testing
+### Testing
 
 ChickenButt includes tests covering conversation storage, streaming, cancellation, Markdown sanitization, navigation security, desktop integration, dependency declarations, and installed layouts.
 
-Run individual checks directly from the repository root:
+Run individual checks from the repository root:
 
 ```bash
 python3 scripts/smoke_gui.py
@@ -278,9 +238,7 @@ Please keep changes focused and verify the behavior you touched.
 
 ChickenButt is under active development.
 
-The desktop app is functional and installable from source (Meson) or as a
-development Flatpak (`packaging/flatpak/`). The public website is included in
-this repository. Flathub publication remains a separate maintainer step.
+Versioned Linux Flatpak builds are published on [GitHub Releases](https://github.com/pixelhackstudios/ChickenButt/releases/latest). You can also run from source or build a development Flatpak. The public website lives in this repository. Flathub publication remains a separate maintainer step.
 
 It is built primarily for GNOME-style Linux desktops, though other GTK-compatible environments may work.
 
