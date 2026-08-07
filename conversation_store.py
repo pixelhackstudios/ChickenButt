@@ -105,11 +105,23 @@ class ConversationStore:
                 ON conversations(updated_at DESC);
             """
         )
+        def _ensure_thinking_column() -> None:
+            cols = {
+                r[1]
+                for r in cur.execute("PRAGMA table_info(messages)").fetchall()
+            }
+            if "thinking" not in cols:
+                cur.execute(
+                    "ALTER TABLE messages "
+                    "ADD COLUMN thinking TEXT NOT NULL DEFAULT ''"
+                )
+
         row = cur.execute(
             "SELECT value FROM meta WHERE key = 'schema_version'"
         ).fetchone()
         if row is None:
-            # Fresh DB: CREATE TABLE already has thinking (schema 2).
+            # Do not assume fresh: an old messages table may predate meta.
+            _ensure_thinking_column()
             cur.execute(
                 "INSERT INTO meta(key, value) VALUES ('schema_version', ?)",
                 (str(SCHEMA_VERSION),),
@@ -121,15 +133,7 @@ class ConversationStore:
             version = 1
         if version < 2:
             # Pre-thinking installs used CREATE without the column.
-            cols = {
-                r[1]
-                for r in cur.execute("PRAGMA table_info(messages)").fetchall()
-            }
-            if "thinking" not in cols:
-                cur.execute(
-                    "ALTER TABLE messages "
-                    "ADD COLUMN thinking TEXT NOT NULL DEFAULT ''"
-                )
+            _ensure_thinking_column()
             cur.execute(
                 "UPDATE meta SET value = ? WHERE key = 'schema_version'",
                 (str(SCHEMA_VERSION),),

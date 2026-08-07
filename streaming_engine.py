@@ -201,15 +201,29 @@ class StreamingEngineController:
         stream_seed = (
             continue_seed_for_stream(seed_text) if mode == "continue" else seed_text
         )
-        # Prior thinking for continue-append; replace starts clean.
+        # Resolve display gate before begin_stream so Continue does not reseed
+        # prior thinking into the UI when Show reasoning is off.
+        params = RequestParams()
+        if self._get_request_params is not None and origin_model:
+            try:
+                params = self._get_request_params(origin_model)
+            except Exception:  # noqa: BLE001
+                params = RequestParams()
+        show_reasoning = params.think is True
+
+        # Prior thinking for continue-append / persist; replace starts clean.
         seed_thinking = ""
         if mode == "continue" and assistant_id:
             seed_thinking = self._conversation.message_thinking(assistant_id) or ""
+        # UI only: never paint stored reasoning when display is off.
+        ui_seed_thinking = (
+            seed_thinking if (mode == "continue" and show_reasoning) else ""
+        )
         handle = self._transcript.begin_stream(
             mode=mode,
             message_id=aid,
             stream_seed=stream_seed,
-            seed_thinking=seed_thinking if mode == "continue" else "",
+            seed_thinking=ui_seed_thinking,
             clear_thinking=(mode in ("replace", "new")),
         )
 
@@ -222,7 +236,7 @@ class StreamingEngineController:
             "error": None,
             "ui_done": False,
             "lock": threading.Lock(),
-            "show_reasoning": False,
+            "show_reasoning": show_reasoning,
         }
         outbound = (
             api_messages
@@ -326,15 +340,8 @@ class StreamingEngineController:
 
         def work():
             try:
-                params = RequestParams()
-                if self._get_request_params is not None and origin_model:
-                    try:
-                        params = self._get_request_params(origin_model)
-                    except Exception:  # noqa: BLE001
-                        params = RequestParams()
-                # Display only when Show reasoning is explicitly on (think is True).
-                with state["lock"]:
-                    state["show_reasoning"] = params.think is True
+                # params / show_reasoning resolved on the UI thread before
+                # begin_stream so Continue seed painting stays gated.
 
                 def _on_done(chunk: dict) -> None:
                     if self._on_generation_done is None or not origin_model:
