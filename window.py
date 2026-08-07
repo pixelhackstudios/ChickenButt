@@ -97,26 +97,11 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
 
 APP_CSS = b"""
 /* ============================================================
-   ChickenButt shell branding
-   System supplies light/dark (prefers-color-scheme). ChickenButt
-   owns chrome colors so Flatpak/host theme engines do not define
-   the product look (no stock-Adwaita identity, no host Yaru).
+   ChickenButt owns its palette. Python sets .chickenbutt-dark or
+   .chickenbutt-light on the window from StyleManager.get_dark().
+   No @media (prefers-color-scheme) — no CssProvider scheme sync.
    ============================================================ */
-.chickenbutt-shell {
-    background-color: #121216;
-    color: #e8e8ed;
-}
-.chickenbutt-shell headerbar {
-    background-color: #121216;
-    color: #e8e8ed;
-    box-shadow: none;
-    border-bottom: 1px solid alpha(#ffffff, 0.08);
-}
-.chickenbutt-shell .top-bar,
-.chickenbutt-shell toolbar {
-    background-color: #121216;
-    color: #e8e8ed;
-}
+
 /* Brand accent (matches web --accent) */
 .chickenbutt-shell .suggested-action,
 .chickenbutt-shell .send-btn.suggested-action {
@@ -128,35 +113,89 @@ APP_CSS = b"""
 .chickenbutt-shell .send-btn.suggested-action:hover {
     background-color: #d4af37;
 }
-
-@media (prefers-color-scheme: light) {
-    .chickenbutt-shell {
-        background-color: #f4f4f6;
-        color: #1c1c1e;
-    }
-    .chickenbutt-shell headerbar {
-        background-color: #f4f4f6;
-        color: #1c1c1e;
-        border-bottom: 1px solid alpha(#000000, 0.08);
-    }
-    .chickenbutt-shell .top-bar,
-    .chickenbutt-shell toolbar {
-        background-color: #f4f4f6;
-        color: #1c1c1e;
-    }
+.send-btn.suggested-action {
+    background-color: #c9a227;
+    color: #1a1a12;
 }
 
-/* ---- chat surface (matches WebKit --bg) ---- */
-.chat-surface {
+/* ---- DARK ---- */
+.chickenbutt-dark {
     background-color: #121216;
     color: #e8e8ed;
 }
-@media (prefers-color-scheme: light) {
-    .chat-surface {
-        background-color: #f4f4f6;
-        color: #1c1c1e;
-    }
+.chickenbutt-dark headerbar,
+.chickenbutt-dark .top-bar,
+.chickenbutt-dark toolbar {
+    background-color: #121216;
+    color: #e8e8ed;
+    box-shadow: none;
 }
+.chickenbutt-dark headerbar {
+    border-bottom: 1px solid alpha(#ffffff, 0.08);
+}
+.chickenbutt-dark .chat-surface {
+    background-color: #121216;
+    color: #e8e8ed;
+}
+.chickenbutt-dark .chat-sidebar {
+    background-color: #16161c;
+    border-right: 1px solid alpha(#ffffff, 0.10);
+    color: #e8e8ed;
+}
+.chickenbutt-dark .chat-sidebar-header {
+    border-bottom: 1px solid alpha(#ffffff, 0.08);
+}
+.chickenbutt-dark .chat-sidebar-footer {
+    border-top: 1px solid alpha(#ffffff, 0.08);
+}
+.chickenbutt-dark .chat-sidebar-model-block {
+    border-bottom: 1px solid alpha(#ffffff, 0.08);
+}
+.chickenbutt-dark .chickenbutt-settings-panel,
+.chickenbutt-dark .chickenbutt-settings-panel headerbar {
+    background-color: #121216;
+    color: #e8e8ed;
+}
+
+/* ---- LIGHT ---- */
+.chickenbutt-light {
+    background-color: #f4f4f6;
+    color: #1c1c1e;
+}
+.chickenbutt-light headerbar,
+.chickenbutt-light .top-bar,
+.chickenbutt-light toolbar {
+    background-color: #f4f4f6;
+    color: #1c1c1e;
+    box-shadow: none;
+}
+.chickenbutt-light headerbar {
+    border-bottom: 1px solid alpha(#000000, 0.08);
+}
+.chickenbutt-light .chat-surface {
+    background-color: #f4f4f6;
+    color: #1c1c1e;
+}
+.chickenbutt-light .chat-sidebar {
+    background-color: #ececf0;
+    border-right: 1px solid alpha(#000000, 0.10);
+    color: #1c1c1e;
+}
+.chickenbutt-light .chat-sidebar-header {
+    border-bottom: 1px solid alpha(#000000, 0.08);
+}
+.chickenbutt-light .chat-sidebar-footer {
+    border-top: 1px solid alpha(#000000, 0.08);
+}
+.chickenbutt-light .chat-sidebar-model-block {
+    border-bottom: 1px solid alpha(#000000, 0.08);
+}
+.chickenbutt-light .chickenbutt-settings-panel,
+.chickenbutt-light .chickenbutt-settings-panel headerbar {
+    background-color: #f4f4f6;
+    color: #1c1c1e;
+}
+
 .chat-list {
     background: transparent;
 }
@@ -396,28 +435,10 @@ APP_CSS = b"""
     min-width: 220px;
 }
 
-/* ---- docked chat history rail ---- */
-.chat-sidebar {
-    background-color: #16161c;
-    border-right: 1px solid alpha(#ffffff, 0.10);
-    color: #e8e8ed;
-}
-@media (prefers-color-scheme: light) {
-    .chat-sidebar {
-        background-color: #ececf0;
-        border-right: 1px solid alpha(#000000, 0.10);
-        color: #1c1c1e;
-    }
-}
+/* ---- docked chat history rail (colors under .chickenbutt-dark/light) ---- */
 .chat-sidebar-header {
     padding: 6px 8px 6px 12px;
     min-height: 40px;
-    border-bottom: 1px solid alpha(#ffffff, 0.08);
-}
-@media (prefers-color-scheme: light) {
-    .chat-sidebar-header {
-        border-bottom: 1px solid alpha(#000000, 0.08);
-    }
 }
 .chat-sidebar-title {
     font-weight: 700;
@@ -432,13 +453,7 @@ APP_CSS = b"""
 }
 .chat-sidebar-footer {
     padding: 6px 8px;
-    border-top: 1px solid alpha(#ffffff, 0.08);
     min-height: 40px;
-}
-@media (prefers-color-scheme: light) {
-    .chat-sidebar-footer {
-        border-top: 1px solid alpha(#000000, 0.08);
-    }
 }
 .chat-sidebar list {
     background: transparent;
@@ -517,34 +532,6 @@ GREETING_SUB = (
     "Type in the box: ollama pull <model-name>"
 )
 
-
-def _bind_css_provider_color_scheme(provider: Gtk.CssProvider) -> None:
-    """Sync a custom CssProvider's prefers-color-scheme with libadwaita.
-
-    Manually created providers do not inherit StyleManager appearance on their
-    own; media queries in APP_CSS need this binding or light/dark never flips.
-    """
-    try:
-        sm = Adw.StyleManager.get_default()
-    except Exception:  # noqa: BLE001
-        return
-
-    def sync(*_args) -> None:
-        try:
-            scheme = (
-                Gtk.InterfaceColorScheme.DARK
-                if sm.get_dark()
-                else Gtk.InterfaceColorScheme.LIGHT
-            )
-            provider.set_property("prefers-color-scheme", scheme)
-        except Exception:  # noqa: BLE001
-            pass
-
-    try:
-        sm.connect("notify::dark", sync)
-    except Exception:  # noqa: BLE001
-        pass
-    sync()
 
 def _is_ephemeral_greeting(role: str, content: str) -> bool:
     """Legacy rows may have stored the opener; never treat it as chat context."""

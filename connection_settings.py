@@ -57,66 +57,27 @@ from ollama_client import ModelDescriptor, OllamaClient, OllamaError
 _prefs_css_installed = False
 
 
-def _bind_css_provider_color_scheme(provider: Gtk.CssProvider) -> None:
-    """Sync custom CssProvider media queries with StyleManager effective dark."""
-    try:
-        sm = Adw.StyleManager.get_default()
-    except Exception:  # noqa: BLE001
-        return
-
-    def sync(*_args) -> None:
-        try:
-            scheme = (
-                Gtk.InterfaceColorScheme.DARK
-                if sm.get_dark()
-                else Gtk.InterfaceColorScheme.LIGHT
-            )
-            provider.set_property("prefers-color-scheme", scheme)
-        except Exception:  # noqa: BLE001
-            pass
-
-    try:
-        sm.connect("notify::dark", sync)
-    except Exception:  # noqa: BLE001
-        pass
-    sync()
-
-
 def _ensure_preferences_css() -> None:
-    """Spacing for the embedded settings panel (main-column content swap)."""
+    """Spacing for the embedded settings panel (main-column content swap).
+
+    Colors live on the window under .chickenbutt-dark / .chickenbutt-light
+    (see window.APP_CSS). This provider only handles layout chrome.
+    """
     global _prefs_css_installed
     if _prefs_css_installed:
         return
     provider = Gtk.CssProvider()
     provider.load_from_string(
         """
-        /* Full-column settings page — brand surfaces (match shell / transcript) */
-        .chickenbutt-settings-panel {
-            background-color: #121216;
-            color: #e8e8ed;
-        }
         .chickenbutt-settings-panel headerbar {
             padding-top: 10px;
             padding-bottom: 8px;
-            background-color: #121216;
-            color: #e8e8ed;
         }
         .chickenbutt-settings-panel adw-view-switcher {
             margin-top: 2px;
         }
-        @media (prefers-color-scheme: light) {
-            .chickenbutt-settings-panel {
-                background-color: #f4f4f6;
-                color: #1c1c1e;
-            }
-            .chickenbutt-settings-panel headerbar {
-                background-color: #f4f4f6;
-                color: #1c1c1e;
-            }
-        }
         """
     )
-    _bind_css_provider_color_scheme(provider)
     display = Gdk.Display.get_default()
     if display is not None:
         Gtk.StyleContext.add_provider_for_display(

@@ -137,9 +137,10 @@ There is no GTK4 Flatpak theme extension point for Yaru; Ubuntu’s Yaru/libadwa
 patches are not in `org.gnome.Platform`. Host `Yaru-*` may still emit import
 warnings if the portal advertises them — that is secondary to brand CSS.
 
-`Adw.StyleManager` uses `COLOR_SCHEME_DEFAULT`. WebKit receives `theme_changed`
-from the same dark/light signal. Native chrome uses ChickenButt `APP_CSS`
-(brand backgrounds and accent matching the transcript), not stock desktop chrome.
+`Adw.StyleManager` uses `COLOR_SCHEME_DEFAULT`. Python reads `get_dark()` and
+sets a window class `chickenbutt-dark` or `chickenbutt-light`; the same boolean
+drives WebKit `theme_changed`. No CSS media-query scheme sync on custom
+providers.
 
 ## Architecture
 
