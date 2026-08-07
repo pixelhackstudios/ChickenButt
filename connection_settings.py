@@ -63,17 +63,12 @@ def _ensure_preferences_css() -> None:
     if _prefs_css_installed:
         return
     provider = Gtk.CssProvider()
+    # Spacing only; colors live in GResource style.css
     provider.load_from_string(
         """
-        /* Full-column settings page (Connection · Model · Model Fit).
-           Background follows Adwaita so light/dark stay coherent. */
-        .chickenbutt-settings-panel {
-            background-color: @window_bg_color;
-        }
         .chickenbutt-settings-panel headerbar {
             padding-top: 10px;
             padding-bottom: 8px;
-            background-color: @window_bg_color;
         }
         .chickenbutt-settings-panel adw-view-switcher {
             margin-top: 2px;

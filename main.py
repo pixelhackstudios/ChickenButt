@@ -24,10 +24,56 @@ from release_info import APP_ID, APP_NAME, VERSION
 from tray import TrayIcon
 from window import ChatSidebar
 
+_GRESOURCE_NAME = "chickenbutt-resources.gresource"
+
+
+def _register_app_resources() -> None:
+    """Load GResource so Adw.Application finds style.css (Yaru structural CSS)."""
+    candidates = (
+        os.path.join(APP_DIR, _GRESOURCE_NAME),
+        os.path.join(APP_DIR, "data", _GRESOURCE_NAME),
+    )
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            Gio.resources_register(Gio.Resource.load(path))
+            return
+        except GLib.Error as exc:
+            print(f"gresource load failed ({path}): {exc}", flush=True)
+    xml_path = os.path.join(APP_DIR, "data", "chickenbutt.gresource.xml")
+    out_path = os.path.join(APP_DIR, "data", _GRESOURCE_NAME)
+    if os.path.isfile(xml_path):
+        try:
+            import subprocess
+
+            subprocess.run(
+                [
+                    "glib-compile-resources",
+                    f"--sourcedir={os.path.join(APP_DIR, 'data')}",
+                    f"--target={out_path}",
+                    xml_path,
+                ],
+                check=True,
+                capture_output=True,
+            )
+            Gio.resources_register(Gio.Resource.load(out_path))
+            return
+        except (OSError, subprocess.CalledProcessError, GLib.Error) as exc:
+            print(f"gresource compile failed: {exc}", flush=True)
+    print("warning: style.css GResource not found", flush=True)
+
 
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        # Desktop light/dark via portal (DEFAULT == prefer-light unless dark).
+        try:
+            Adw.StyleManager.get_default().set_color_scheme(
+                Adw.ColorScheme.DEFAULT
+            )
+        except Exception:  # noqa: BLE001
+            pass
         self.window: ChatSidebar | None = None
         self.tray: TrayIcon | None = None
         self.connect("activate", self._on_activate)
@@ -147,6 +193,7 @@ def main() -> int:
     if "--version" in sys.argv[1:]:
         print(f"{APP_NAME} {VERSION}")
         return 0
+    _register_app_resources()
     Adw.init()
     GLib.set_application_name(APP_NAME)
     GLib.set_prgname(APP_NAME)

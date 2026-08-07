@@ -1,7 +1,9 @@
-# Flatpak notes
+# Flatpak appearance
 
-Runtime: `org.gnome.Platform//50`. Session bus for portals + tray.
+- Session bus → Settings portal (color-scheme + accent).
+- `Adw.StyleManager` `DEFAULT` follows prefer-dark / prefer-light.
+- Bundled GResource `style.css`: Yaru structural greys + system accent vars.
+- No `GTK_THEME`, no host theme mounts.
 
-Appearance: follow the desktop via libadwaita (no app theme product). Layout
-and chrome use Adwaita CSS color tokens (`@window_bg_color`, etc.) so light
-and dark track the session. No `GTK_THEME` force and no host theme mounts.
+Ubuntu tip: use GTK theme **Yaru** (or Yaru-yellow, …) with **Appearance**
+Light/Dark — not the legacy **Yaru-dark** application theme name.

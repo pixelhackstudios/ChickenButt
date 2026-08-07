@@ -1,109 +1,99 @@
-/* Layout-only application CSS. No color theme.
- * Light/dark comes from the desktop via libadwaita StyleManager.
+/*
+ * ChickenButt application CSS (Adw.Application GResource style.css).
+ *
+ * Light/dark: @media (prefers-color-scheme: dark) via StyleManager / portal.
+ * Structural greys: Yaru / Yaru-dark define-colors (yaru-theme-gtk).
+ * Accent: system libadwaita variables (portal yellow/etc.) — not hard-coded.
+ * No GTK_THEME, no host theme mounts.
+ *
+ * Attribution: data/YARU_ATTRIBUTION.md
  */
 
-.chat-sidebar-header {
-  padding: 6px 8px 6px 12px;
-  min-height: 40px;
+/* ---- Yaru structural LIGHT ---- */
+:root {
+  --window-bg-color: #fafafa;
+  --window-fg-color: #3d3d3d;
+  --view-bg-color: #ffffff;
+  --view-fg-color: #3d3d3d;
+  --headerbar-bg-color: #fafafa;
+  --headerbar-fg-color: #3d3d3d;
+  --headerbar-backdrop-color: #fafafa;
+  --headerbar-border-color: #cccccc;
+  --sidebar-bg-color: #fafafa;
+  --sidebar-fg-color: #3d3d3d;
+  --sidebar-backdrop-color: #f0f0f0;
+  --sidebar-border-color: #cccccc;
+  --card-bg-color: #ffffff;
+  --card-fg-color: #3d3d3d;
+  --popover-bg-color: #ffffff;
+  --popover-fg-color: #3d3d3d;
+  --dialog-bg-color: #fafafa;
+  --dialog-fg-color: #3d3d3d;
+  --border-color: #cccccc;
 }
 
-.chat-sidebar-footer {
-  padding: 6px 8px;
-  min-height: 40px;
+/* ---- Yaru structural DARK ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --window-bg-color: #2c2c2c;
+    --window-fg-color: #f7f7f7;
+    --view-bg-color: #272727;
+    --view-fg-color: #f7f7f7;
+    --headerbar-bg-color: #2c2c2c;
+    --headerbar-fg-color: #f7f7f7;
+    --headerbar-backdrop-color: #2c2c2c;
+    --headerbar-border-color: #131313;
+    --sidebar-bg-color: #2a2a2a;
+    --sidebar-fg-color: #f7f7f7;
+    --sidebar-backdrop-color: #272727;
+    --sidebar-border-color: #131313;
+    --card-bg-color: #272727;
+    --card-fg-color: #f7f7f7;
+    --popover-bg-color: #2c2c2c;
+    --popover-fg-color: #f7f7f7;
+    --dialog-bg-color: #2c2c2c;
+    --dialog-fg-color: #f7f7f7;
+    --border-color: #131313;
+  }
 }
 
-.chat-sidebar-model-block {
-  padding-bottom: 4px;
+/* ---- Shell chrome ---- */
+window {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
 }
 
-.chat-sidebar-model {
-  padding: 4px 12px 10px 12px;
+headerbar {
+  background-color: var(--headerbar-bg-color);
+  color: var(--headerbar-fg-color);
+  border-bottom: 1px solid var(--headerbar-border-color);
+  box-shadow: none;
 }
 
-.chat-sidebar-model dropdown {
-  min-height: 38px;
-  border-radius: 10px;
+/* ---- chat surface ---- */
+.chat-surface {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
 }
-
-.chat-sidebar-title {
-  font-weight: 700;
-  font-size: 0.95em;
-}
-
-.chat-sidebar-section {
-  font-size: 0.72em;
-  font-weight: 600;
-  opacity: 0.55;
-  margin: 8px 14px 4px 14px;
-  letter-spacing: 0.02em;
-}
-
-.chat-sidebar list {
-  background: transparent;
-}
-
-.chat-sidebar row {
-  border-radius: 10px;
-  margin: 1px 8px;
-  padding: 0;
-  min-height: 0;
-}
-
-.chat-sidebar-row-title {
-  font-weight: 500;
-  font-size: 0.92em;
-}
-
-.chat-sidebar-row-active {
-  font-weight: 700;
-}
-
-.chat-sidebar-row-meta {
-  font-size: 0.75em;
-  opacity: 0.5;
-}
-
-.chat-sidebar-row-actions {
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.chat-sidebar row:hover .chat-sidebar-row-actions,
-.chat-sidebar row:selected .chat-sidebar-row-actions,
-.chat-sidebar-row-actions:focus-within {
-  opacity: 1;
-}
-
-.chat-sidebar-row-actions button {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 0;
-}
-
-.chickenbutt-settings-panel headerbar {
-  padding-top: 10px;
-  padding-bottom: 8px;
-}
-
-.chickenbutt-settings-panel adw-view-switcher {
-  margin-top: 2px;
-}
-
 .chat-list {
   background: transparent;
 }
 
+/* ---- empty state ---- */
+.empty-state {
+  opacity: 0.95;
+}
 .empty-title {
   font-size: 1.15em;
   font-weight: 700;
   margin-top: 10px;
+  color: alpha(var(--window-fg-color), 0.88);
 }
-
 .empty-sub {
   opacity: 0.55;
   margin-top: 18px;
+  color: alpha(var(--window-fg-color), 0.7);
 }
-
 .empty-icon {
   opacity: 0.92;
   margin-bottom: 6px;
@@ -111,129 +101,216 @@
   min-height: 64px;
 }
 
+/* ---- message rows / bubbles (native fallback) ---- */
 .msg-row {
   margin-top: 2px;
   margin-bottom: 2px;
 }
-
 .msg-row-user {
   margin-left: 24px;
 }
-
+.msg-row-assistant {
+  margin-right: 0;
+}
 .chat-bubble {
   border-radius: 16px;
   padding: 10px 14px;
   min-width: 40px;
   font-size: 15px;
 }
-
 .chat-user {
-  /* System accent from libadwaita / desktop */
   background-color: var(--accent-bg-color);
   color: var(--accent-fg-color);
   border-bottom-right-radius: 0;
+  box-shadow: 0 1px 3px alpha(black, 0.18);
 }
-
 .chat-assistant {
   background-color: transparent;
+  color: alpha(var(--window-fg-color), 0.92);
   border-radius: 0;
   box-shadow: none;
   padding-left: 0;
   padding-right: 0;
 }
-
+.chat-error {
+  background-color: alpha(var(--error-bg-color), 0.18);
+  border: 1px solid alpha(var(--error-color), 0.35);
+}
 .chat-body {
   font-size: 15px;
   line-height: 1.5;
 }
-
+.chat-user .chat-body {
+  color: var(--accent-fg-color);
+}
 .chat-meta {
   font-size: 0.7em;
   opacity: 0.45;
   margin-top: 3px;
   margin-left: 4px;
   margin-right: 4px;
+  color: alpha(var(--window-fg-color), 0.7);
 }
-
+.chat-user-meta {
+  opacity: 0.55;
+  color: alpha(var(--window-fg-color), 0.75);
+}
 .typing-dots {
   font-weight: 700;
   letter-spacing: 0.12em;
   opacity: 0.55;
 }
-
 .reasoning-expander {
   margin: 0 0 8px 0;
   padding: 4px 0;
 }
-
 .reasoning-body {
   padding: 4px 12px 12px 12px;
 }
 
+/* ---- sidebar ---- */
+.chat-sidebar {
+  background-color: var(--sidebar-bg-color);
+  color: var(--sidebar-fg-color);
+  border-right: 1px solid var(--sidebar-border-color);
+}
+.chat-sidebar-model-block {
+  border-bottom: 1px solid alpha(var(--window-fg-color), 0.08);
+  padding-bottom: 4px;
+}
+.chat-sidebar-model {
+  padding: 4px 12px 10px 12px;
+}
+.chat-sidebar-model dropdown {
+  min-height: 38px;
+  border-radius: 10px;
+}
+.chat-sidebar-header {
+  padding: 6px 8px 6px 12px;
+  min-height: 40px;
+  border-bottom: 1px solid alpha(var(--window-fg-color), 0.08);
+}
+.chat-sidebar-title {
+  font-weight: 700;
+  font-size: 0.95em;
+}
+.chat-sidebar-section {
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.55;
+  margin: 8px 14px 4px 14px;
+  letter-spacing: 0.02em;
+}
+.chat-sidebar-footer {
+  padding: 6px 8px;
+  border-top: 1px solid alpha(var(--window-fg-color), 0.08);
+  min-height: 40px;
+}
+.chat-sidebar list {
+  background: transparent;
+}
+.chat-sidebar row {
+  border-radius: 10px;
+  margin: 1px 8px;
+  padding: 0;
+  min-height: 0;
+}
+.chat-sidebar row:hover {
+  background-color: alpha(var(--window-fg-color), 0.06);
+}
+.chat-sidebar row:selected {
+  background-color: alpha(var(--accent-bg-color), 0.22);
+}
+.chat-sidebar-row-title {
+  font-weight: 500;
+  font-size: 0.92em;
+}
+.chat-sidebar-row-active {
+  font-weight: 700;
+}
+.chat-sidebar-row-meta {
+  font-size: 0.75em;
+  opacity: 0.5;
+}
+.chat-sidebar-row-actions {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.chat-sidebar row:hover .chat-sidebar-row-actions,
+.chat-sidebar row:selected .chat-sidebar-row-actions,
+.chat-sidebar-row-actions:focus-within {
+  opacity: 1;
+}
+.chat-sidebar-row-actions button {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+/* ---- composer ---- */
 .composer-bar {
   background-color: transparent;
   background-image: none;
   padding: 6px 12px 16px 12px;
   border-top: none;
 }
-
 .composer-shell {
-  background-color: alpha(currentColor, 0.08);
+  background-color: alpha(var(--window-fg-color), 0.08);
   border-radius: 22px;
-  border: 1px solid alpha(currentColor, 0.12);
+  border: 1px solid alpha(var(--window-fg-color), 0.12);
   padding: 4px 4px 4px 12px;
+  box-shadow: 0 4px 18px alpha(black, 0.12), 0 1px 3px alpha(black, 0.08);
 }
-
 .composer-shell:focus-within {
   border-color: alpha(var(--accent-bg-color), 0.55);
-  background-color: alpha(currentColor, 0.1);
+  background-color: alpha(var(--window-fg-color), 0.10);
+  box-shadow: 0 6px 22px alpha(black, 0.16), 0 0 0 1px alpha(var(--accent-bg-color), 0.15);
 }
-
 .composer-input {
   background: transparent;
   border: none;
   box-shadow: none;
   font-size: 0.95em;
 }
-
 .composer-input textview,
 .composer-input text {
   background: transparent;
+  color: alpha(var(--window-fg-color), 0.92);
 }
-
 .composer-scroll {
   background: transparent;
   border: none;
   box-shadow: none;
   min-width: 0;
 }
-
 .composer-scroll > scrollbar {
   margin: 0;
 }
-
 .composer-hint {
   font-size: 0.72em;
   opacity: 0.42;
+  color: alpha(var(--window-fg-color), 0.7);
   margin-bottom: 8px;
+  transition: opacity 280ms ease;
 }
-
 .composer-hint.faded {
   opacity: 0;
 }
-
 .composer-meta-row {
   margin-top: 4px;
   margin-left: 6px;
   margin-right: 6px;
   min-height: 0;
 }
-
 .composer-char-count {
   font-size: 0.72em;
   opacity: 0.55;
+  color: alpha(var(--window-fg-color), 0.7);
 }
-
+.composer-char-count.warning {
+  opacity: 0.9;
+  color: var(--warning-color);
+}
 .send-btn,
 .stop-btn {
   min-width: 36px;
@@ -241,50 +318,52 @@
   padding: 0;
   border-radius: 999px;
 }
+.send-btn.suggested-action {
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+}
 
+/* ---- header ---- */
 .header-title {
   font-weight: 700;
 }
-
 .header-sub {
   font-size: 0.78em;
   opacity: 0.6;
 }
 
+/* ---- model load ---- */
 .load-overlay {
-  background-color: alpha(black, 0.5);
+  background-color: alpha(black, 0.62);
 }
-
 .load-card {
   background-color: var(--window-bg-color);
   border-radius: 18px;
   padding: 28px 32px;
   min-width: 280px;
-  border: 1px solid alpha(currentColor, 0.12);
+  border: 1px solid alpha(var(--window-fg-color), 0.10);
+  box-shadow: 0 12px 40px alpha(black, 0.45);
 }
-
 .load-title {
   font-size: 1.05em;
   font-weight: 700;
 }
-
 .load-model {
   font-size: 0.95em;
   opacity: 0.9;
   margin-top: 4px;
 }
-
 .load-status {
   font-size: 0.82em;
   opacity: 0.55;
   margin-top: 10px;
 }
-
 .load-progress {
   margin-top: 14px;
   min-width: 220px;
 }
 
+/* ---- health banner ---- */
 .health-banner {
   background-color: alpha(var(--accent-bg-color), 0.12);
   border: 1px solid alpha(var(--accent-bg-color), 0.28);
@@ -293,24 +372,35 @@
   margin-top: 4px;
   margin-bottom: 4px;
 }
-
 .health-banner.error {
   background-color: alpha(var(--error-bg-color), 0.12);
   border-color: alpha(var(--error-color), 0.35);
 }
-
 .health-banner.warn {
   background-color: alpha(var(--warning-bg-color), 0.14);
   border-color: alpha(var(--warning-color), 0.35);
 }
-
 .health-banner-title {
   font-weight: 700;
   font-size: 0.95em;
 }
-
 .health-banner-detail {
   font-size: 0.85em;
   opacity: 0.85;
+  margin-top: 2px;
+}
+
+/* ---- settings panel ---- */
+.chickenbutt-settings-panel {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
+}
+.chickenbutt-settings-panel headerbar {
+  padding-top: 10px;
+  padding-bottom: 8px;
+  background-color: var(--headerbar-bg-color);
+  color: var(--headerbar-fg-color);
+}
+.chickenbutt-settings-panel adw-view-switcher {
   margin-top: 2px;
 }
