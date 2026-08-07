@@ -123,7 +123,21 @@ No listening server in ChickenButt.
 | `--talk-name=org.kde.StatusNotifierWatcher` | Tray host |
 | `--own-name=org.kde.StatusNotifierItem.*` | Tray item name ownership |
 
-**Not granted by default:** home filesystem, full device access, system bus, pulseaudio.
+**Not granted by default:** home filesystem, full device access, system bus, pulseaudio,
+host theme trees (`~/.themes`, `/usr/share/themes`), or `GTK_THEME` pointing at host Yaru.
+
+### Theming / light–dark (Flatpak)
+
+ChickenButt **follows the desktop color-scheme** (prefer-dark / prefer-light) via
+libadwaita `StyleManager` and the WebKit transcript theme bridge. It does **not**
+grant host theme filesystem access and does not copy host `gtk-4.0/gtk.css`.
+
+Host theme names such as `Yaru-dark` often arrive through the settings portal, but
+their gresources are not in `org.gnome.Platform`. `main.py` therefore, when
+`FLATPAK_ID` is set and `GTK_THEME` is unset, selects **Adwaita** so GTK does not
+try to import missing Yaru resources. Light/dark still track the system preference.
+Users can override with e.g. `flatpak override --user --env=GTK_THEME=…` if a
+compatible Flatpak theme extension is installed.
 
 ## Architecture
 
