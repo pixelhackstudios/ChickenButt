@@ -48,7 +48,12 @@
   </screenshots>
 
   <releases>
-    <release version="@VERSION@" date="2026-08-05">
+    <release version="@VERSION@" date="2026-08-06">
+      <description>
+        <p>Version 0.1.2: Reasoning/thinking transcript support with Show reasoning toggle, persistence and Ollama history, Continue/regenerate handling, and SQLite v1→v2 migration.</p>
+      </description>
+    </release>
+    <release version="0.1.1" date="2026-08-05">
       <description>
         <p>Version 0.1.1: Flatpak packaging with settings (connection, per-model controls, Model Fit) and aligned release metadata.</p>
       </description>
