@@ -99,7 +99,7 @@ APP_CSS = b"""
 /* ============================================================
    ChickenButt owns its palette. Python sets .chickenbutt-dark or
    .chickenbutt-light on the window from StyleManager.get_dark().
-   No @media (prefers-color-scheme) — no CssProvider scheme sync.
+   No @media (prefers-color-scheme); no CssProvider scheme sync.
    ============================================================ */
 
 /* Brand accent (matches web --accent) */
@@ -542,6 +542,13 @@ class ChatSidebar(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, client: OllamaClient | None = None):
         super().__init__(application=app, title="ChickenButt")
         self.add_css_class("chickenbutt-shell")
+        self._sync_appearance_classes()
+        try:
+            Adw.StyleManager.get_default().connect(
+                "notify::dark", lambda *_: self._sync_appearance_classes()
+            )
+        except Exception:  # noqa: BLE001
+            pass
         self._model_profiles = ModelProfileService(
             settings_dir=_SETTINGS_DIR,
             settings_path=_SETTINGS_PATH,
@@ -955,10 +962,19 @@ class ChatSidebar(Adw.ApplicationWindow):
             return True
         return False
 
+    def _sync_appearance_classes(self) -> None:
+        """Apply chickenbutt-dark or chickenbutt-light from StyleManager."""
+        try:
+            dark = bool(Adw.StyleManager.get_default().get_dark())
+        except Exception:  # noqa: BLE001
+            dark = True
+        self.remove_css_class("chickenbutt-light")
+        self.remove_css_class("chickenbutt-dark")
+        self.add_css_class("chickenbutt-dark" if dark else "chickenbutt-light")
+
     def _install_css(self) -> None:
         css = Gtk.CssProvider()
         css.load_from_data(APP_CSS)
-        _bind_css_provider_color_scheme(css)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
             css,
