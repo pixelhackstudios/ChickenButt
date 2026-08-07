@@ -253,18 +253,22 @@ def main() -> int:
         readme_text,
     )
     results.check(
-        "[14] README says AppStream metadata is now installed",
-        "AppStream metadata is installed" in readme_text,
-        readme_text,
+        "[14] README leads with GitHub Releases Flatpak install",
+        "releases/latest" in readme_text
+        and "flatpak install --user" in readme_text
+        and "flatpak run io.github.pixelhackstudios.ChickenButt" in readme_text,
+        readme_text[readme_text.find("Install ChickenButt") : readme_text.find("Install ChickenButt") + 500]
+        if "Install ChickenButt" in readme_text
+        else readme_text[:500],
     )
     results.check(
-        "[14] README documents development Flatpak packaging (Flathub separate)",
-        "Install as a Flatpak" in readme_text
-        and "development" in readme_text.lower()
+        "[14] README documents development Flatpak build (Flathub separate)",
+        "build_flatpak.sh" in readme_text
+        and "Build from source" in readme_text
         and "Flathub" in readme_text,
-        readme_text[readme_text.find("Flatpak") : readme_text.find("Flatpak") + 400]
-        if "Flatpak" in readme_text
-        else readme_text[:400],
+        readme_text[readme_text.find("Build from source") : readme_text.find("Build from source") + 500]
+        if "Build from source" in readme_text
+        else readme_text[:500],
     )
     results.check("[15] vendored-code notice includes DOMPurify", "DOMPurify" in readme_text)
 
