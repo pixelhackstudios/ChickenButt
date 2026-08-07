@@ -857,8 +857,9 @@
     }
   }
 
-  function finalizeStream(n, fullText) {
+  function finalizeStream(n, fullText, thinkingText) {
     if (fullText != null) n.raw = fullText;
+    if (thinkingText != null) n.reasoning = thinkingText;
     // Flush carry
     const s = n.stream;
     if (s && s.carry) {
@@ -889,6 +890,8 @@
     n.bubble.classList.remove("streaming");
     n.bubble.classList.remove("in-code");
     if (n.row) n.row.classList.remove("streaming-row");
+    if (n.reasoning) setReasoning(n, n.reasoning, { streaming: false });
+    else setReasoning(n, "");
     n.body.innerHTML = renderMarkdown(n.raw || "");
     wireCodeUi(n.body);
     highlightAllIn(n.body);
@@ -900,6 +903,76 @@
     if (n.id) return n.id;
     if (n.row) return n.row.dataset.id || "";
     return "";
+  }
+
+  /* ---------- reasoning (sibling of answer content) ---------- */
+
+  function ensureReasoningEl(n, streaming) {
+    if (!n || n.role === "user") return null;
+    if (n.reasoningDetails) {
+      if (n.reasoningSummary) {
+        n.reasoningSummary.textContent = streaming ? "Thinking…" : "Reasoning";
+      }
+      if (streaming) n.reasoningDetails.open = true;
+      return n.reasoningDetails;
+    }
+    const details = document.createElement("details");
+    details.className = "reasoning";
+    if (streaming) details.open = true;
+    const summary = document.createElement("summary");
+    summary.className = "reasoning-summary";
+    summary.textContent = streaming ? "Thinking…" : "Reasoning";
+    const pre = document.createElement("pre");
+    pre.className = "reasoning-body";
+    details.appendChild(summary);
+    details.appendChild(pre);
+    // Above answer body inside the bubble
+    n.bubble.insertBefore(details, n.body);
+    n.reasoningDetails = details;
+    n.reasoningSummary = summary;
+    n.reasoningBody = pre;
+    n.reasoning = n.reasoning || "";
+    return details;
+  }
+
+  function setReasoning(n, text, opts) {
+    opts = opts || {};
+    if (!n || n.role === "user") return;
+    const raw = text || "";
+    n.reasoning = raw;
+    if (!raw) {
+      if (n.reasoningDetails && n.reasoningDetails.parentNode) {
+        n.reasoningDetails.parentNode.removeChild(n.reasoningDetails);
+      }
+      n.reasoningDetails = null;
+      n.reasoningSummary = null;
+      n.reasoningBody = null;
+      return;
+    }
+    ensureReasoningEl(n, !!opts.streaming);
+    if (n.reasoningBody) n.reasoningBody.textContent = raw;
+    if (n.reasoningSummary) {
+      n.reasoningSummary.textContent = opts.streaming ? "Thinking…" : "Reasoning";
+    }
+    if (n.reasoningDetails) {
+      if (opts.streaming) n.reasoningDetails.open = true;
+      else if (opts.collapse !== false) n.reasoningDetails.open = false;
+    }
+  }
+
+  function appendReasoning(n, chunk) {
+    if (!n || !chunk) return;
+    n.reasoning = (n.reasoning || "") + chunk;
+    ensureReasoningEl(n, true);
+    if (n.reasoningBody) n.reasoningBody.textContent = n.reasoning;
+    if (n.reasoningSummary) n.reasoningSummary.textContent = "Thinking…";
+    if (n.reasoningDetails) n.reasoningDetails.open = true;
+  }
+
+  function collapseReasoning(n) {
+    if (!n || !n.reasoningDetails) return;
+    if (n.reasoningSummary) n.reasoningSummary.textContent = "Reasoning";
+    n.reasoningDetails.open = false;
   }
 
   /* ---------- message lifecycle ---------- */
@@ -947,9 +1020,13 @@
       body,
       role,
       raw: text || "",
+      reasoning: opts.thinking || "",
       stream: null,
       actions,
       editing: false,
+      reasoningDetails: null,
+      reasoningSummary: null,
+      reasoningBody: null,
     };
     nodes.set(id, n);
 
@@ -957,12 +1034,14 @@
       body.textContent = text || "";
       setActionsVisible(id, true);
     } else if (opts.streaming || opts.streaming === undefined) {
+      if (n.reasoning) setReasoning(n, n.reasoning, { streaming: true, collapse: false });
       if (text) streamUpdate(n, text);
       else ensureStream(n);
       bubble.classList.add("streaming");
       row.classList.add("streaming-row");
       setActionsVisible(id, false);
     } else {
+      if (n.reasoning) setReasoning(n, n.reasoning, { streaming: false });
       body.innerHTML = renderMarkdown(text || "");
       if (!opts.deferWire) wireCodeUi(body);
       highlightAllIn(body);
@@ -998,10 +1077,14 @@
     scrollIfPinned();
   }
 
-  function messageDone(id, text) {
+  function messageDone(id, text, thinking) {
     const n = nodes.get(id);
     if (!n) return;
-    finalizeStream(n, text != null ? text : n.raw);
+    finalizeStream(
+      n,
+      text != null ? text : n.raw,
+      thinking != null ? thinking : n.reasoning
+    );
     scrollIfPinned();
   }
 
@@ -1017,12 +1100,23 @@
     n.stream = null;
     n.bubble.classList.remove("error");
     n.body.innerHTML = "";
+    if (opts.clear_thinking) {
+      setReasoning(n, "");
+    } else if (opts.thinking != null) {
+      setReasoning(n, opts.thinking || "", {
+        streaming: !!opts.streaming && !(opts.text || ""),
+        collapse: !opts.streaming,
+      });
+    }
     if (opts.streaming) {
       n.bubble.classList.add("streaming");
       if (n.row) n.row.classList.add("streaming-row");
       setActionsVisible(id, false);
       ensureStream(n);
-      if (n.raw) streamUpdate(n, n.raw);
+      if (n.raw) {
+        collapseReasoning(n);
+        streamUpdate(n, n.raw);
+      }
     } else {
       n.bubble.classList.remove("streaming");
       if (n.row) n.row.classList.remove("streaming-row");
@@ -1053,6 +1147,7 @@
           event.messages.forEach((m) => {
             addMessage(m.id, m.role, m.content || m.text || "", {
               streaming: false,
+              thinking: m.thinking || "",
               // Restoring N messages must not force a scroll-height
               // layout read N times — one pinned scroll after the whole
               // batch below is enough and lands in the same place.
@@ -1110,28 +1205,52 @@
           }
           const next = (n.raw || "") + (event.text || "");
           n.bubble.classList.add("streaming");
+          if (n.reasoning) collapseReasoning(n);
           streamUpdate(n, next);
+          scrollIfPinned();
+        }
+        break;
+      case "reasoning_delta":
+        {
+          let n = nodes.get(event.id);
+          if (!n) {
+            addMessage(event.id, "assistant", "", { streaming: true });
+            n = nodes.get(event.id);
+          }
+          if (!n) break;
+          n.bubble.classList.add("streaming");
+          if (n.row) n.row.classList.add("streaming-row");
+          appendReasoning(n, event.text || "");
           scrollIfPinned();
         }
         break;
       case "message_done":
         messageDone(
           event.id,
-          event.text != null ? event.text : undefined
+          event.text != null ? event.text : undefined,
+          event.thinking != null ? event.thinking : undefined
         );
         break;
       case "message_error":
-        updateMessage(event.id, event.text || "Error", {
-          streaming: false,
-          finalize: true,
-          error: true,
-        });
-        setActionsVisible(event.id, true);
+        {
+          const n = nodes.get(event.id);
+          if (n && event.thinking != null) {
+            setReasoning(n, event.thinking || "", { streaming: false });
+          }
+          updateMessage(event.id, event.text || "Error", {
+            streaming: false,
+            finalize: true,
+            error: true,
+          });
+          setActionsVisible(event.id, true);
+        }
         break;
       case "message_reset":
         messageReset(event.id, {
           streaming: event.streaming !== false,
           text: event.text || event.content || "",
+          thinking: event.thinking,
+          clear_thinking: !!event.clear_thinking,
         });
         break;
       case "message_removed":

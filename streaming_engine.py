@@ -172,7 +172,7 @@ class StreamingEngineController:
         mode: str = "new",
         assistant_id: str | None = None,
         seed_text: str = "",
-        api_messages: list[dict[str, str]] | None = None,
+        api_messages: list[dict] | None = None,
     ) -> None:
         """mode: new | replace | continue."""
         if self._streaming:
@@ -201,19 +201,28 @@ class StreamingEngineController:
         stream_seed = (
             continue_seed_for_stream(seed_text) if mode == "continue" else seed_text
         )
+        # Prior thinking for continue-append; replace starts clean.
+        seed_thinking = ""
+        if mode == "continue" and assistant_id:
+            seed_thinking = self._conversation.message_thinking(assistant_id) or ""
         handle = self._transcript.begin_stream(
             mode=mode,
             message_id=aid,
             stream_seed=stream_seed,
+            seed_thinking=seed_thinking if mode == "continue" else "",
+            clear_thinking=(mode in ("replace", "new")),
         )
 
         pending: list[str] = []
         collected: list[str] = []
+        thinking_pending: list[str] = []
+        thinking_collected: list[str] = []
         state = {
             "streaming": True,
             "error": None,
             "ui_done": False,
             "lock": threading.Lock(),
+            "show_reasoning": False,
         }
         outbound = (
             api_messages
@@ -232,10 +241,13 @@ class StreamingEngineController:
             state["ui_done"] = True
             err = state["error"]
             piece = "".join(collected)
+            thinking_piece = "".join(thinking_collected)
             if mode == "continue":
                 final = join_continue(seed_text, piece)
+                final_thinking = join_continue(seed_thinking, thinking_piece)
             else:
                 final = piece
+                final_thinking = thinking_piece
 
             if err is not None:
                 # Keep partial transcript; surface plain-language recovery
@@ -247,20 +259,32 @@ class StreamingEngineController:
                     )
                 )
                 self._transcript.stream_error(
-                    handle, error=str(err), final=final
+                    handle,
+                    error=str(err),
+                    final=final,
+                    thinking=final_thinking if state["show_reasoning"] else "",
                 )
             else:
-                self._transcript.finalize_stream(handle, final=final)
+                self._transcript.finalize_stream(
+                    handle,
+                    final=final,
+                    thinking=final_thinking if state["show_reasoning"] else "",
+                )
 
             self.commit_assistant_result(
                 aid,
                 final,
                 mode=mode,
                 origin_conversation_id=origin_conversation_id or "",
-                allow_empty=bool(err),
+                allow_empty=bool(err) or bool(final_thinking),
+                thinking=final_thinking,
             )
             # Refresh native action bar with final text (no-op on WebKit / empty)
-            self._transcript.replace_final_row(handle, final)
+            self._transcript.replace_final_row(
+                handle,
+                final,
+                thinking=final_thinking if state["show_reasoning"] else "",
+            )
             if not self._transcript.is_webkit:
                 self._transcript.scroll_to_end()
             self.stream_finished()
@@ -272,8 +296,13 @@ class StreamingEngineController:
             with state["lock"]:
                 chunk = "".join(pending) if pending else ""
                 pending.clear()
+                tchunk = "".join(thinking_pending) if thinking_pending else ""
+                thinking_pending.clear()
                 still_streaming = state["streaming"]
+                show = state["show_reasoning"]
 
+            if tchunk and show:
+                self._transcript.stream_reasoning_delta(handle, tchunk)
             if chunk:
                 self._transcript.stream_delta(handle, chunk)
 
@@ -283,6 +312,11 @@ class StreamingEngineController:
             with state["lock"]:
                 leftover = "".join(pending) if pending else ""
                 pending.clear()
+                tleft = "".join(thinking_pending) if thinking_pending else ""
+                thinking_pending.clear()
+                show = state["show_reasoning"]
+            if tleft and show and still_current():
+                self._transcript.stream_reasoning_delta(handle, tleft)
             if leftover and still_current():
                 self._transcript.stream_delta(handle, leftover)
             finalize_ui()
@@ -298,6 +332,9 @@ class StreamingEngineController:
                         params = self._get_request_params(origin_model)
                     except Exception:  # noqa: BLE001
                         params = RequestParams()
+                # Display only when Show reasoning is explicitly on (think is True).
+                with state["lock"]:
+                    state["show_reasoning"] = params.think is True
 
                 def _on_done(chunk: dict) -> None:
                     if self._on_generation_done is None or not origin_model:
@@ -307,6 +344,13 @@ class StreamingEngineController:
                     except Exception:  # noqa: BLE001
                         pass
 
+                def _on_thinking(piece: str) -> None:
+                    if not piece:
+                        return
+                    thinking_collected.append(piece)
+                    with state["lock"]:
+                        thinking_pending.append(piece)
+
                 for piece in self.client.chat_stream(
                     origin_model,
                     list(outbound),
@@ -315,6 +359,7 @@ class StreamingEngineController:
                     keep_alive=params.keep_alive,
                     think=params.think,
                     on_done=_on_done if self._on_generation_done is not None else None,
+                    on_thinking=_on_thinking,
                 ):
                     collected.append(piece)
                     with state["lock"]:
@@ -336,25 +381,43 @@ class StreamingEngineController:
         mode: str,
         origin_conversation_id: str,
         allow_empty: bool = False,
+        thinking: str = "",
     ) -> None:
-        if not final and not allow_empty:
+        thinking = thinking or ""
+        if not final and not thinking and not allow_empty:
             return
-        text = final or "(no response)"
+        # Thinking-only partial (Stop mid-reasoning) keeps empty content, not
+        # the placeholder — content and thinking stay siblings.
+        if final:
+            text = final
+        elif thinking:
+            text = ""
+        else:
+            text = "(no response)"
         idx = self._message_actions.find_message_index(assistant_id)
         messages = self._conversation.messages
         if mode == "continue" and idx >= 0:
             messages[idx]["content"] = text
+            messages[idx]["thinking"] = thinking
             try:
-                self._get_store().update_message(assistant_id, text)
+                self._get_store().update_message(
+                    assistant_id, text, thinking=thinking
+                )
             except Exception as exc:  # noqa: BLE001
                 print(f"continue persist: {exc}", flush=True)
             return
         if mode == "replace":
             if idx >= 0:
                 messages[idx]["content"] = text
+                messages[idx]["thinking"] = thinking
             else:
                 self._conversation.append_local(
-                    {"id": assistant_id, "role": "assistant", "content": text}
+                    {
+                        "id": assistant_id,
+                        "role": "assistant",
+                        "content": text,
+                        "thinking": thinking,
+                    }
                 )
             try:
                 # Row was deleted before stream; re-insert into the
@@ -364,17 +427,25 @@ class StreamingEngineController:
                     role="assistant",
                     content=text,
                     message_id=assistant_id,
+                    thinking=thinking,
                 )
             except Exception as exc:  # noqa: BLE001
                 # Might already exist if delete failed — try update
                 try:
-                    self._get_store().update_message(assistant_id, text)
+                    self._get_store().update_message(
+                        assistant_id, text, thinking=thinking
+                    )
                 except Exception as exc2:  # noqa: BLE001
                     print(f"replace persist: {exc} / {exc2}", flush=True)
             return
         # new
         self._conversation.append_local(
-            {"id": assistant_id, "role": "assistant", "content": text}
+            {
+                "id": assistant_id,
+                "role": "assistant",
+                "content": text,
+                "thinking": thinking,
+            }
         )
         try:
             self._get_store().append_message(
@@ -382,6 +453,7 @@ class StreamingEngineController:
                 role="assistant",
                 content=text,
                 message_id=assistant_id,
+                thinking=thinking,
             )
         except Exception as exc:  # noqa: BLE001
             print(f"persist message failed: {exc}", flush=True)

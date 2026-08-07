@@ -725,9 +725,67 @@ class MessageBody(Gtk.Box):
         if role == "user":
             self._user_label.set_max_width_chars(48)
 
+        # Optional reasoning panel (sibling of answer content, not merged).
+        self._reasoning_text = ""
+        self._reasoning_expander: Gtk.Expander | None = None
+        self._reasoning_label: Gtk.Label | None = None
+
+    def clear_reasoning(self) -> None:
+        self._reasoning_text = ""
+        if self._reasoning_expander is not None:
+            try:
+                self.remove(self._reasoning_expander)
+            except Exception:  # noqa: BLE001
+                pass
+        self._reasoning_expander = None
+        self._reasoning_label = None
+
+    def _ensure_reasoning_ui(self) -> None:
+        if self._reasoning_expander is not None:
+            return
+        exp = Gtk.Expander(label="Thinking…")
+        exp.add_css_class("reasoning-expander")
+        exp.set_expanded(True)
+        lab = Gtk.Label(label="")
+        lab.set_wrap(True)
+        lab.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        lab.set_xalign(0.0)
+        lab.set_selectable(True)
+        lab.add_css_class("dim-label")
+        lab.add_css_class("reasoning-body")
+        exp.set_child(lab)
+        # Keep reasoning above answer content children.
+        self.prepend(exp)
+        self._reasoning_expander = exp
+        self._reasoning_label = lab
+
+    def set_reasoning(self, text: str, *, streaming: bool = False) -> None:
+        text = text or ""
+        if not text.strip():
+            self.clear_reasoning()
+            return
+        self._reasoning_text = text
+        self._ensure_reasoning_ui()
+        assert self._reasoning_label is not None
+        assert self._reasoning_expander is not None
+        self._reasoning_label.set_text(text)
+        self._reasoning_expander.set_label(
+            "Thinking…" if streaming else "Reasoning"
+        )
+        self._reasoning_expander.set_expanded(bool(streaming))
+
+    def append_reasoning(self, chunk: str) -> None:
+        if not chunk:
+            return
+        self._reasoning_text = (self._reasoning_text or "") + chunk
+        self.set_reasoning(self._reasoning_text, streaming=True)
+
     def _clear_children(self) -> None:
         while child := self.get_first_child():
             self.remove(child)
+        self._reasoning_expander = None
+        self._reasoning_label = None
+        # Keep _reasoning_text so set_reasoning can reattach after clear.
 
     def set_typing(self) -> None:
         self._clear_children()

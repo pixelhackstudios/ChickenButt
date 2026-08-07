@@ -1291,9 +1291,23 @@ class ChatSidebar(Adw.ApplicationWindow):
         """Compatibility delegator for retained transcript consumers and tests."""
         self._transcript.render_empty()
 
-    def _apply_restored_transcript(self, messages: list[dict[str, str]]) -> None:
-        """Compatibility delegator for retained transcript consumers and tests."""
-        self._transcript.replay(messages)
+    def _apply_restored_transcript(self, messages: list[dict]) -> None:
+        """Replay messages; paint thinking only when Show reasoning is on."""
+        show = False
+        model = getattr(self, "_model", None)
+        try:
+            if model:
+                params = self._model_profiles.request_params(model)
+                show = params.think is True
+        except Exception:  # noqa: BLE001
+            show = False
+        display: list[dict] = []
+        for m in messages:
+            row = dict(m)
+            if not show and "thinking" in row:
+                row["thinking"] = ""
+            display.append(row)
+        self._transcript.replay(display)
 
     def _select_active_history_row(self) -> None:
         """Compatibility delegator retained for Phase-17 tests."""

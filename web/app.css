@@ -163,6 +163,46 @@ body.theme-light {
   width: 100%;
 }
 
+/* Reasoning is a sibling of answer content (never merged into .md-body) */
+.reasoning {
+  margin: 0 0 10px 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.88em;
+  line-height: 1.45;
+}
+
+body.theme-light .reasoning {
+  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.reasoning-summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 12px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.reasoning-summary::-webkit-details-marker {
+  display: none;
+}
+
+.reasoning-body {
+  margin: 0;
+  padding: 0 12px 10px 12px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--muted);
+}
+
 .meta {
   font-size: 0.7rem;
   color: var(--muted);

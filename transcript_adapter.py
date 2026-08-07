@@ -132,7 +132,7 @@ class TranscriptAdapter:
             self._native_rows.clear()
             self._show_empty_state()
 
-    def replay(self, messages: list[dict[str, str]]) -> None:
+    def replay(self, messages: list[dict]) -> None:
         if self._web is not None:
             # WebView may not be ready yet; reset queues until load finishes.
             self._web.reset(messages)
@@ -148,16 +148,19 @@ class TranscriptAdapter:
         for message in messages:
             role = message.get("role") or "assistant"
             content = message.get("content") or ""
+            thinking = message.get("thinking") or ""
             message_id = message.get("id") or self._message_id_provider(role[:4])
             if role == "user":
                 self.append_native_row("user", content, message_id=message_id)
             else:
-                self.append_native_row(
+                body = self.append_native_row(
                     "assistant",
                     content,
                     markdown=True,
                     message_id=message_id,
                 )
+                if thinking and hasattr(body, "set_reasoning"):
+                    body.set_reasoning(thinking, streaming=False)
 
     def remove_native_message(self, message_id: str) -> None:
         row = self._native_rows.pop(message_id, None)
@@ -256,6 +259,8 @@ class TranscriptAdapter:
         mode: str,
         message_id: str,
         stream_seed: str = "",
+        seed_thinking: str = "",
+        clear_thinking: bool = False,
     ) -> StreamHandle:
         """Create the streaming surface for mode new|replace|continue."""
         if self.is_webkit:
@@ -266,6 +271,8 @@ class TranscriptAdapter:
                         "id": message_id,
                         "streaming": True,
                         "text": "",
+                        "thinking": "",
+                        "clear_thinking": True,
                     }
                 )
             elif mode == "continue":
@@ -276,6 +283,8 @@ class TranscriptAdapter:
                         "id": message_id,
                         "streaming": True,
                         "text": stream_seed,
+                        "thinking": seed_thinking or "",
+                        "clear_thinking": False,
                     }
                 )
             else:
@@ -286,6 +295,7 @@ class TranscriptAdapter:
                         "role": "assistant",
                         "text": "",
                         "streaming": True,
+                        "thinking": "",
                     }
                 )
             return StreamHandle(message_id=message_id, mode=mode)
@@ -306,10 +316,14 @@ class TranscriptAdapter:
             )
             if stream_seed:
                 body.append_stream(stream_seed)
+            if seed_thinking:
+                body.set_reasoning(seed_thinking, streaming=False)
         else:
             body = self.append_native_row(
                 "assistant", "···", typing=True, message_id=message_id
             )
+        if clear_thinking and hasattr(body, "clear_reasoning"):
+            body.clear_reasoning()
         body._render_serial = getattr(body, "_render_serial", 0) + 1
         return StreamHandle(
             message_id=message_id,
@@ -343,8 +357,30 @@ class TranscriptAdapter:
             handle._body.append_stream(chunk)
             self.scroll_to_end()
 
+    def stream_reasoning_delta(self, handle: StreamHandle, chunk: str) -> None:
+        """Append a paced reasoning delta (display path only)."""
+        if not chunk:
+            return
+        if self.is_webkit:
+            self.post(
+                {
+                    "type": "reasoning_delta",
+                    "id": handle.message_id,
+                    "text": chunk,
+                }
+            )
+            return
+        if handle._body is not None and hasattr(handle._body, "append_reasoning"):
+            handle._body.append_reasoning(chunk)
+            self.scroll_to_end()
+
     def stream_error(
-        self, handle: StreamHandle, *, error: str, final: str
+        self,
+        handle: StreamHandle,
+        *,
+        error: str,
+        final: str,
+        thinking: str = "",
     ) -> None:
         """Present an error on the live stream surface."""
         text = f"Error: {error}" if not final else final + f"\n\n[Error: {error}]"
@@ -354,6 +390,7 @@ class TranscriptAdapter:
                     "type": "message_error",
                     "id": handle.message_id,
                     "text": text,
+                    "thinking": thinking or "",
                 }
             )
             return
@@ -363,38 +400,59 @@ class TranscriptAdapter:
         parent = body.get_parent()
         if parent is not None:
             parent.add_css_class("chat-error")
+        if thinking and hasattr(body, "set_reasoning"):
+            body.set_reasoning(thinking, streaming=False)
         body.set_plain(text)
 
-    def finalize_stream(self, handle: StreamHandle, *, final: str) -> None:
+    def finalize_stream(
+        self, handle: StreamHandle, *, final: str, thinking: str = ""
+    ) -> None:
         """Complete a successful or empty native/WebKit stream body."""
+        if final:
+            done_text = final
+        elif thinking:
+            done_text = ""
+        else:
+            done_text = "(no response)"
         if self.is_webkit:
             self.post(
                 {
                     "type": "message_done",
                     "id": handle.message_id,
-                    "text": final or "(no response)",
+                    "text": done_text,
+                    "thinking": thinking or "",
                 }
             )
             return
         body = handle._body
         if body is None:
             return
+        if thinking and hasattr(body, "set_reasoning"):
+            body.set_reasoning(thinking, streaming=False)
         if final:
             body.finish_stream()
+        elif thinking:
+            body.set_plain("")
         else:
             body.set_plain("(no response)")
 
-    def replace_final_row(self, handle: StreamHandle, final: str) -> None:
+    def replace_final_row(
+        self, handle: StreamHandle, final: str, *, thinking: str = ""
+    ) -> None:
         """Replace the temporary native streaming row with an action-enabled row."""
-        if self.is_webkit or not final:
+        if self.is_webkit:
+            return
+        if not final and not thinking:
             return
         self.remove_native_message(handle.message_id)
-        self.append_native_row(
+        body = self.append_native_row(
             "assistant",
-            final,
-            markdown=True,
+            final or "",
+            markdown=bool(final),
             message_id=handle.message_id,
         )
+        if thinking and hasattr(body, "set_reasoning"):
+            body.set_reasoning(thinking, streaming=False)
         self.scroll_to_end()
 
     def append_native_row(
