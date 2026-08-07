@@ -66,34 +66,18 @@ def _register_app_resources() -> None:
     print("warning: no chickenbutt GResource found", flush=True)
 
 
-def _color_scheme_from_gtk_theme() -> "Adw.ColorScheme":
-    """Map Flatseal/user GTK_THEME the same way people fix Evolution.
-
-    Examples users actually set:
-      GTK_THEME=Adwaita:dark
-      GTK_THEME=Yaru-dark
-      GTK_THEME=Yaru-yellow-dark
-    Unset / plain theme name → follow the desktop color-scheme portal.
-    """
-    theme = (os.environ.get("GTK_THEME") or "").strip().lower()
-    if not theme:
-        return Adw.ColorScheme.DEFAULT
-    # GTK accepts "Name:dark" / "Name:light" and "Name-dark" theme dirs.
-    if ":dark" in theme or theme.endswith("-dark") or "-dark-" in theme:
-        return Adw.ColorScheme.FORCE_DARK
-    if ":light" in theme or theme.endswith("-light") or "-light-" in theme:
-        return Adw.ColorScheme.FORCE_LIGHT
-    return Adw.ColorScheme.DEFAULT
-
-
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # Desktop portal by default; honor GTK_THEME when the user forces it
-        # (Flatseal), same workflow as Evolution dark mode.
+        # libadwaita Styles & Appearance docs:
+        # ADW_COLOR_SCHEME_DEFAULT on the default StyleManager is equivalent to
+        # PREFER_LIGHT — light unless the system prefers dark (Settings portal /
+        # freedesktop color-scheme). Do not invent themes or map GTK_THEME.
+        # Evolution's GTK_THEME=Adwaita:dark path is for classic GTK theming;
+        # this app is libadwaita and uses the color-scheme portal instead.
         try:
             Adw.StyleManager.get_default().set_color_scheme(
-                _color_scheme_from_gtk_theme()
+                Adw.ColorScheme.DEFAULT
             )
         except Exception:  # noqa: BLE001
             pass

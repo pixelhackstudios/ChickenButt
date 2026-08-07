@@ -25,17 +25,10 @@ finish-args:
   - --socket=session-bus
   - --talk-name=org.kde.StatusNotifierWatcher
   - --own-name=org.kde.StatusNotifierItem.*
-  # Same model as other Ubuntu Flatpaks (Evolution, etc.): let the app see
-  # host GTK themes/icons so Flatseal GTK_THEME=Yaru-dark / Adwaita:dark works.
-  # We do not set GTK_THEME ourselves — the user/desktop owns that.
-  - --filesystem=xdg-config/gtk-3.0:ro
-  - --filesystem=xdg-config/gtk-4.0:ro
-  - --filesystem=xdg-data/themes:ro
-  - --filesystem=xdg-data/icons:ro
-  - --filesystem=~/.themes:ro
-  - --filesystem=~/.icons:ro
-  - --filesystem=/usr/share/themes:ro
-  - --filesystem=/usr/share/icons:ro
+  # Appearance: Flatpak docs (Desktop Integration → Theming / Appearance
+  # Settings). Host /usr themes cannot be mounted (sandbox /usr is the
+  # runtime). color-scheme is via the Settings portal (session-bus above).
+  # libadwaita does not use host Yaru GTK CSS; it follows the portal.
 
 cleanup:
   - /include
