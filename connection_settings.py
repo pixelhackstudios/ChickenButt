@@ -57,6 +57,31 @@ from ollama_client import ModelDescriptor, OllamaClient, OllamaError
 _prefs_css_installed = False
 
 
+def _bind_css_provider_color_scheme(provider: Gtk.CssProvider) -> None:
+    """Sync custom CssProvider media queries with StyleManager effective dark."""
+    try:
+        sm = Adw.StyleManager.get_default()
+    except Exception:  # noqa: BLE001
+        return
+
+    def sync(*_args) -> None:
+        try:
+            scheme = (
+                Gtk.InterfaceColorScheme.DARK
+                if sm.get_dark()
+                else Gtk.InterfaceColorScheme.LIGHT
+            )
+            provider.set_property("prefers-color-scheme", scheme)
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        sm.connect("notify::dark", sync)
+    except Exception:  # noqa: BLE001
+        pass
+    sync()
+
+
 def _ensure_preferences_css() -> None:
     """Spacing for the embedded settings panel (main-column content swap)."""
     global _prefs_css_installed
@@ -91,6 +116,7 @@ def _ensure_preferences_css() -> None:
         }
         """
     )
+    _bind_css_provider_color_scheme(provider)
     display = Gdk.Display.get_default()
     if display is not None:
         Gtk.StyleContext.add_provider_for_display(

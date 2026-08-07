@@ -517,6 +517,35 @@ GREETING_SUB = (
     "Type in the box: ollama pull <model-name>"
 )
 
+
+def _bind_css_provider_color_scheme(provider: Gtk.CssProvider) -> None:
+    """Sync a custom CssProvider's prefers-color-scheme with libadwaita.
+
+    Manually created providers do not inherit StyleManager appearance on their
+    own; media queries in APP_CSS need this binding or light/dark never flips.
+    """
+    try:
+        sm = Adw.StyleManager.get_default()
+    except Exception:  # noqa: BLE001
+        return
+
+    def sync(*_args) -> None:
+        try:
+            scheme = (
+                Gtk.InterfaceColorScheme.DARK
+                if sm.get_dark()
+                else Gtk.InterfaceColorScheme.LIGHT
+            )
+            provider.set_property("prefers-color-scheme", scheme)
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        sm.connect("notify::dark", sync)
+    except Exception:  # noqa: BLE001
+        pass
+    sync()
+
 def _is_ephemeral_greeting(role: str, content: str) -> bool:
     """Legacy rows may have stored the opener; never treat it as chat context."""
     return role == "assistant" and (content or "").strip() == GREETING_TEXT
@@ -942,6 +971,7 @@ class ChatSidebar(Adw.ApplicationWindow):
     def _install_css(self) -> None:
         css = Gtk.CssProvider()
         css.load_from_data(APP_CSS)
+        _bind_css_provider_color_scheme(css)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
             css,
