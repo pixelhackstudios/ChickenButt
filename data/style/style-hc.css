@@ -1,7 +1,0 @@
-/* High-contrast adjustments (Adw.Application when HC preference is on).
- * Keep minimal — libadwaita already strengthens borders/opacity.
- */
-
-:root {
-  --border-opacity: 50%;
-}

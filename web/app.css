@@ -1,4 +1,5 @@
 :root {
+  /* Dark defaults; media query + body.theme-* correct first paint and bridge. */
   --bg: #121216;
   --fg: #e8e8ed;
   --muted: rgba(255, 255, 255, 0.55);
@@ -15,6 +16,19 @@
   /* ~768px; bump to 52rem if you want more code room */
 }
 
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f4f6;
+    --fg: #1c1c1e;
+    --muted: rgba(0, 0, 0, 0.5);
+    --bubble-user: #e4e4ea;
+    --bubble-user-fg: #1c1c1e;
+    --bubble-assistant: rgba(0, 0, 0, 0.06);
+    --code-bg: #eef0f4;
+    --code-header: #e2e5eb;
+  }
+}
+
 html,
 body {
   margin: 0;
@@ -26,6 +40,7 @@ body {
   overflow: hidden;
 }
 
+/* Explicit bridge from StyleManager (wins over media query when set) */
 body.theme-light {
   --bg: #f4f4f6;
   --fg: #1c1c1e;
@@ -35,6 +50,17 @@ body.theme-light {
   --bubble-assistant: rgba(0, 0, 0, 0.06);
   --code-bg: #eef0f4;
   --code-header: #e2e5eb;
+}
+
+body.theme-dark {
+  --bg: #121216;
+  --fg: #e8e8ed;
+  --muted: rgba(255, 255, 255, 0.55);
+  --bubble-user: #22222c;
+  --bubble-user-fg: #dfdfdf;
+  --bubble-assistant: rgba(255, 255, 255, 0.08);
+  --code-bg: #1a1b22;
+  --code-header: #22232c;
 }
 
 #root {

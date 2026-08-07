@@ -130,16 +130,17 @@ host theme trees (`~/.themes`, `/usr/share/themes`).
 
 Standard libadwaita application styling (GNOME HIG / Adw.Application docs):
 
-- `Adw.Application` auto-loads GResource stylesheets at the app resource base
-  path: `style.css`, `style-dark.css`, `style-hc.css`, `style-hc-dark.css`.
+- Single GResource `style.css` at the app resource base path (Adw.Application
+  auto-load). Light/dark brand tokens use `@media (prefers-color-scheme: …)`
+  so libadwaita can set the provider scheme and first paint is correct.
+  Do **not** use deprecated `style-dark.css` / `style-hc*.css` split files.
 - Bundle: `data/chickenbutt.gresource.xml` → meson `gnome.compile_resources`
   → installed next to Python modules; `main.py` registers it before startup.
 - Brand only: override libadwaita CSS variables (`--accent-bg-color`,
-  `--window-bg-color`, sidebar tokens, …) to match the WebKit transcript
-  palette and gold accent. Layout classes use `var(--…)` — not a second theme
-  engine.
+  `--window-bg-color`, sidebar tokens) to match the WebKit transcript and gold
+  accent. Layout/geometry rules are outside media queries so they always apply.
 - `Adw.StyleManager` `COLOR_SCHEME_DEFAULT` for system light/dark.
-- WebKit receives `theme_changed` from `StyleManager.get_dark()`.
+- WebKit: CSS media queries + `theme_changed` from `StyleManager.get_dark()`.
 - No `GTK_THEME` force, no host theme mounts, no Yaru Flatpak theme extension.
 
 ## Architecture

@@ -1,8 +1,0 @@
-/* High-contrast + dark. Brand dark tokens from style-dark remain; boost contrast. */
-
-:root {
-  --border-opacity: 50%;
-  --window-fg-color: #ffffff;
-  --sidebar-fg-color: #ffffff;
-  --headerbar-fg-color: #ffffff;
-}

@@ -180,10 +180,12 @@ def build_history_sidebar(*, width: int) -> HistorySidebarWidgets:
 
 
 def build_header() -> HeaderWidgets:
-    """Standard window header chrome (no CSD title buttons)."""
+    """Standard Adw header: system close/min/max on the end (GNOME button-layout)."""
     header = Adw.HeaderBar()
-    header.set_show_end_title_buttons(False)
-    header.set_show_start_title_buttons(False)
+    # Follow the desktop window-control layout. Hiding both ends makes first
+    # paint look broken on Ubuntu/GNOME until something forces a re-layout.
+    header.set_show_end_title_buttons(True)
+    header.set_show_start_title_buttons(True)
 
     title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
     title_box.set_valign(Gtk.Align.CENTER)

@@ -31,8 +31,8 @@ _GRESOURCE_NAME = "chickenbutt-resources.gresource"
 def _register_app_resources() -> None:
     """Register application GResource so Adw.Application can load style.css.
 
-    Must run before Adw.Application startup (which auto-loads style.css,
-    style-dark.css, style-hc.css, style-hc-dark.css from the resource base path).
+    Must run before Adw.Application startup (auto-loads style.css from the
+    resource base path; light/dark via prefers-color-scheme media queries).
     """
     candidates = (
         os.path.join(APP_DIR, _GRESOURCE_NAME),
