@@ -1,0 +1,29 @@
+# Disposable PoC only — not ChickenButt production.
+id: io.github.pixelhackstudios.YaruCssPoc
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: yaru-css-poc
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Settings portal for color-scheme + accent (no host theme mounts, no GTK_THEME)
+  - --socket=session-bus
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - "*.a"
+  - "*.la"
+
+modules:
+  - name: yaru-css-poc
+    buildsystem: meson
+    config-opts:
+      - --buildtype=release
+    sources:
+      - type: dir
+        path: ..

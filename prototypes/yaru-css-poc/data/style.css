@@ -1,0 +1,139 @@
+/*
+ * Yaru-derived structural styling for a small widget set.
+ *
+ * Light/dark: @media (prefers-color-scheme: dark) - driven by Adw.StyleManager
+ * via the Settings portal (not GTK_THEME, not host theme files).
+ *
+ * Accent: use libadwaita system accent variables (portal). Do not hardcode
+ * Yaru orange here.
+ *
+ * Color constants: from Ubuntu yaru-theme-gtk GTK4 gresource @define-color
+ * for Yaru / Yaru-dark (see ATTRIBUTION.md).
+ */
+
+/* ---- LIGHT (Yaru structural) ---- */
+:root {
+  --window-bg-color: #fafafa;
+  --window-fg-color: #3d3d3d;
+  --view-bg-color: #ffffff;
+  --view-fg-color: #3d3d3d;
+  --headerbar-bg-color: #fafafa;
+  --headerbar-fg-color: #3d3d3d;
+  --headerbar-backdrop-color: #fafafa;
+  --headerbar-border-color: #cccccc;
+  --sidebar-bg-color: #fafafa;
+  --sidebar-fg-color: #3d3d3d;
+  --sidebar-backdrop-color: #f0f0f0;
+  --sidebar-border-color: #cccccc;
+  --card-bg-color: #ffffff;
+  --card-fg-color: #3d3d3d;
+  --popover-bg-color: #ffffff;
+  --popover-fg-color: #3d3d3d;
+  --dialog-bg-color: #fafafa;
+  --dialog-fg-color: #3d3d3d;
+  /* borders helper used by some widgets */
+  --border-color: #cccccc;
+}
+
+/* ---- DARK (Yaru-dark structural) ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --window-bg-color: #2c2c2c;
+    --window-fg-color: #f7f7f7;
+    --view-bg-color: #272727;
+    --view-fg-color: #f7f7f7;
+    --headerbar-bg-color: #2c2c2c;
+    --headerbar-fg-color: #f7f7f7;
+    --headerbar-backdrop-color: #2c2c2c;
+    --headerbar-border-color: #131313;
+    --sidebar-bg-color: #2a2a2a;
+    --sidebar-fg-color: #f7f7f7;
+    --sidebar-backdrop-color: #272727;
+    --sidebar-border-color: #131313;
+    --card-bg-color: #272727;
+    --card-fg-color: #f7f7f7;
+    --popover-bg-color: #2c2c2c;
+    --popover-fg-color: #f7f7f7;
+    --dialog-bg-color: #2c2c2c;
+    --dialog-fg-color: #f7f7f7;
+    --border-color: #131313;
+  }
+}
+
+/* ---- Widgets used by the PoC (and ChickenButt-like shell) ---- */
+
+window {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
+}
+
+headerbar {
+  background-color: var(--headerbar-bg-color);
+  color: var(--headerbar-fg-color);
+  border-bottom: 1px solid var(--headerbar-border-color);
+  box-shadow: none;
+}
+
+.poc-sidebar {
+  background-color: var(--sidebar-bg-color);
+  color: var(--sidebar-fg-color);
+  border-right: 1px solid var(--sidebar-border-color);
+  min-width: 200px;
+}
+
+.poc-sidebar list {
+  background: transparent;
+}
+
+.poc-sidebar row {
+  border-radius: 8px;
+  margin: 2px 8px;
+  padding: 6px 10px;
+}
+
+.poc-sidebar row:hover {
+  background-color: alpha(currentColor, 0.06);
+}
+
+.poc-sidebar row:selected {
+  /* system accent — not hard-coded Yaru orange */
+  background-color: alpha(var(--accent-bg-color), 0.22);
+  color: var(--window-fg-color);
+}
+
+.poc-content {
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+}
+
+.poc-panel {
+  background-color: var(--card-bg-color);
+  color: var(--card-fg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px;
+}
+
+/* Keep suggested-action on system accent */
+button.suggested-action {
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+}
+
+entry,
+textview {
+  background-color: var(--view-bg-color);
+  color: var(--view-fg-color);
+}
+
+popover {
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+}
+
+.poc-status {
+  opacity: 0.75;
+  font-size: 0.9em;
+  padding: 8px 12px;
+}

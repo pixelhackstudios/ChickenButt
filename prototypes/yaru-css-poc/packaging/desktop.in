@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=@APP_NAME@
+Exec=yaru-css-poc
+Icon=application-x-executable
+Type=Application
+Categories=Development;
+StartupWMClass=@APP_ID@
