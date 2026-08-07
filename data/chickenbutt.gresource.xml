@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <!-- Adw.Application loads style.css from the app resource base path.
-       Single stylesheet + media queries (libadwaita 1.9+). -->
+  <!-- Adw.Application auto-loads style.css always; style-dark.css when dark. -->
   <gresource prefix="/io/github/pixelhackstudios/ChickenButt">
     <file alias="style.css">style/style.css</file>
+    <file alias="style-dark.css">style/style-dark.css</file>
   </gresource>
 </gresources>

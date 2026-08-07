@@ -1,0 +1,27 @@
+/*
+ * Loaded by Adw.Application when StyleManager:dark is TRUE.
+ * Yaru-dark structural greys (yaru-theme-gtk define-colors).
+ * Does not depend on prefers-color-scheme media-query timing at first paint.
+ */
+
+:root {
+  --window-bg-color: #2c2c2c;
+  --window-fg-color: #f7f7f7;
+  --view-bg-color: #272727;
+  --view-fg-color: #f7f7f7;
+  --headerbar-bg-color: #2c2c2c;
+  --headerbar-fg-color: #f7f7f7;
+  --headerbar-backdrop-color: #2c2c2c;
+  --headerbar-border-color: #131313;
+  --sidebar-bg-color: #2a2a2a;
+  --sidebar-fg-color: #f7f7f7;
+  --sidebar-backdrop-color: #272727;
+  --sidebar-border-color: #131313;
+  --card-bg-color: #272727;
+  --card-fg-color: #f7f7f7;
+  --popover-bg-color: #2c2c2c;
+  --popover-fg-color: #f7f7f7;
+  --dialog-bg-color: #2c2c2c;
+  --dialog-fg-color: #f7f7f7;
+  --border-color: #131313;
+}

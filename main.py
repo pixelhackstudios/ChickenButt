@@ -125,9 +125,49 @@ class ChickenButtApp(Adw.Application):
             else:
                 print("Tray ready — click for Show / Hide / Exit.", flush=True)
             self.window.present()
+            # First paint can miss portal/CssProvider scheme until Appearance
+            # is toggled. Kick the same refresh that toggle triggers, then focus.
+            GLib.idle_add(self._kick_appearance)
+            GLib.timeout_add(50, self._kick_appearance)
+            GLib.timeout_add(200, self._kick_appearance)
             GLib.idle_add(self._focus_input)
         else:
             self._show_window()
+
+    def _kick_appearance(self) -> bool:
+        """Re-assert color scheme + layout so cold start matches post-toggle."""
+        try:
+            sm = Adw.StyleManager.get_default()
+            dark = bool(sm.get_dark())
+            # FORCE then DEFAULT re-runs Adw's stylesheet provider update
+            # (same effect as toggling GNOME Appearance once).
+            sm.set_color_scheme(
+                Adw.ColorScheme.FORCE_DARK if dark else Adw.ColorScheme.FORCE_LIGHT
+            )
+            sm.set_color_scheme(Adw.ColorScheme.DEFAULT)
+        except Exception:  # noqa: BLE001
+            pass
+        if self.window is not None:
+            try:
+                self.window.queue_resize()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                # Keep WebKit in sync if transcript is already up.
+                t = getattr(self.window, "_transcript", None)
+                if t is not None and hasattr(t, "set_theme_dark"):
+                    t.set_theme_dark(bool(Adw.StyleManager.get_default().get_dark()))
+                elif t is not None and hasattr(t, "post"):
+                    dark = bool(Adw.StyleManager.get_default().get_dark())
+                    t.post(
+                        {
+                            "type": "theme_changed",
+                            "theme": "dark" if dark else "light",
+                        }
+                    )
+            except Exception:  # noqa: BLE001
+                pass
+        return False
 
     def _focus_input(self) -> bool:
         if self.window is not None:

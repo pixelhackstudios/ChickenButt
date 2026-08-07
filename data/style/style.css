@@ -1,15 +1,15 @@
 /*
- * ChickenButt application CSS (Adw.Application GResource style.css).
+ * ChickenButt GResource style.css (always loaded by Adw.Application).
  *
- * Light/dark: @media (prefers-color-scheme: dark) via StyleManager / portal.
- * Structural greys: Yaru / Yaru-dark define-colors (yaru-theme-gtk).
- * Accent: system libadwaita variables (portal yellow/etc.) — not hard-coded.
- * No GTK_THEME, no host theme mounts.
+ * Light structural Yaru greys live here. Dark overrides are in style-dark.css
+ * (Adw enables that provider when StyleManager:dark is true — reliable on
+ * first paint; media queries alone needed a GNOME appearance toggle to fix
+ * layout). Layout rules below apply in both modes.
  *
- * Attribution: data/YARU_ATTRIBUTION.md
+ * Accent: system --accent-* (portal). Attribution: data/YARU_ATTRIBUTION.md
  */
 
-/* ---- Yaru structural LIGHT ---- */
+/* ---- Yaru structural LIGHT (base) ---- */
 :root {
   --window-bg-color: #fafafa;
   --window-fg-color: #3d3d3d;
@@ -32,7 +32,7 @@
   --border-color: #cccccc;
 }
 
-/* ---- Yaru structural DARK ---- */
+/* Belt-and-suspenders: also flip via media query when CssProvider scheme is set */
 @media (prefers-color-scheme: dark) {
   :root {
     --window-bg-color: #2c2c2c;
