@@ -166,10 +166,22 @@ install_data(
   rename: '@0@.svg'.format(app_id),
 )
 
+# Application GResource: Adw.Application auto-loads style.css / style-dark.css
+# (and HC variants) from the app resource base path. Bundle lives next to the
+# Python modules so main.py can Gio.Resource.load() it at startup.
+gnome = import('gnome')
+gnome.compile_resources(
+  'chickenbutt-resources',
+  'data/chickenbutt.gresource.xml',
+  source_dir: 'data',
+  gresource_bundle: true,
+  install: true,
+  install_dir: pkglibdir,
+)
+
 # Update the desktop database and icon cache on install/uninstall when the
 # relevant system utilities are available; this is a no-op (not an error)
 # when they aren't, e.g. inside this project's own temporary-prefix tests.
-gnome = import('gnome')
 gnome.post_install(
   update_desktop_database: true,
   gtk_update_icon_cache: true,

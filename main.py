@@ -11,27 +11,6 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-
-def _prepare_flatpak_gtk_theme() -> None:
-    """Use a GTK theme that actually exists inside the Flatpak runtime.
-
-    Ubuntu hosts often inject GTK_THEME=Yaru-*. Yaru's GTK4 CSS is a gresource
-    that is **not** shipped in org.gnome.Platform, so theme load fails and
-    libadwaita color tokens (@window_bg_color, etc.) come out wrong — that is
-    the "borked light/dark" look, not a missing brand palette.
-
-    Adwaita here is sandbox availability only (same as other GNOME-runtime
-    Flatpaks). Product branding is accent CSS + the WebKit transcript, not
-    the base theme name. Light/dark still follows the desktop color-scheme.
-    """
-    if not os.environ.get("FLATPAK_ID"):
-        return
-    os.environ["GTK_THEME"] = "Adwaita"
-
-
-# Before Gtk/Adw import so the theme name is fixed before first style load.
-_prepare_flatpak_gtk_theme()
-
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -45,11 +24,63 @@ from release_info import APP_ID, APP_NAME, VERSION
 from tray import TrayIcon
 from window import ChatSidebar
 
+# GResource filename produced by meson gnome.compile_resources(..., gresource_bundle: true)
+_GRESOURCE_NAME = "chickenbutt-resources.gresource"
+
+
+def _register_app_resources() -> None:
+    """Register application GResource so Adw.Application can load style.css.
+
+    Must run before Adw.Application startup (which auto-loads style.css,
+    style-dark.css, style-hc.css, style-hc-dark.css from the resource base path).
+    """
+    candidates = (
+        os.path.join(APP_DIR, _GRESOURCE_NAME),
+        # Uninstalled: meson build dir next to sources is uncommon; also try data/
+        os.path.join(APP_DIR, "data", _GRESOURCE_NAME),
+        os.path.join(APP_DIR, "build", _GRESOURCE_NAME),
+    )
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            resource = Gio.Resource.load(path)
+            Gio.resources_register(resource)
+            return
+        except GLib.Error as exc:
+            print(f"gresource load failed ({path}): {exc}", flush=True)
+    # Dev fallback: compile from XML if glib-compile-resources is available
+    xml_path = os.path.join(APP_DIR, "data", "chickenbutt.gresource.xml")
+    if os.path.isfile(xml_path):
+        out_path = os.path.join(APP_DIR, "data", _GRESOURCE_NAME)
+        try:
+            import subprocess
+
+            subprocess.run(
+                [
+                    "glib-compile-resources",
+                    f"--sourcedir={os.path.join(APP_DIR, 'data')}",
+                    f"--target={out_path}",
+                    xml_path,
+                ],
+                check=True,
+                capture_output=True,
+            )
+            resource = Gio.Resource.load(out_path)
+            Gio.resources_register(resource)
+            return
+        except (OSError, subprocess.CalledProcessError, GLib.Error) as exc:
+            print(f"gresource compile/load fallback failed: {exc}", flush=True)
+    print(
+        "warning: no chickenbutt GResource found; Adw style.css not loaded",
+        flush=True,
+    )
+
 
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # System light/dark; libadwaita paints chrome from the active base theme.
+        # Follow system light/dark / high-contrast via libadwaita.
         try:
             Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)
         except Exception:  # noqa: BLE001
@@ -173,6 +204,8 @@ def main() -> int:
     if "--version" in sys.argv[1:]:
         print(f"{APP_NAME} {VERSION}")
         return 0
+    # GResource before Adw.Application startup loads style.css automatically.
+    _register_app_resources()
     Adw.init()
     GLib.set_application_name(APP_NAME)
     GLib.set_prgname(APP_NAME)

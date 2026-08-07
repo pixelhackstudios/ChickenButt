@@ -54,38 +54,6 @@ from model_profile import (
 )
 from ollama_client import ModelDescriptor, OllamaClient, OllamaError
 
-_prefs_css_installed = False
-
-
-def _ensure_preferences_css() -> None:
-    """Spacing for the embedded settings panel (main-column content swap).
-
-    Colors come from libadwaita tokens (see window.APP_CSS). This provider
-    only handles layout chrome.
-    """
-    global _prefs_css_installed
-    if _prefs_css_installed:
-        return
-    provider = Gtk.CssProvider()
-    provider.load_from_string(
-        """
-        .chickenbutt-settings-panel headerbar {
-            padding-top: 10px;
-            padding-bottom: 8px;
-        }
-        .chickenbutt-settings-panel adw-view-switcher {
-            margin-top: 2px;
-        }
-        """
-    )
-    display = Gdk.Display.get_default()
-    if display is not None:
-        Gtk.StyleContext.add_provider_for_display(
-            display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-    _prefs_css_installed = True
-
-
 def open_folder(path: Path, *, parent: Gtk.Window | None = None) -> None:
     """Reveal *path* in the file manager; create the directory if needed."""
     try:
@@ -210,7 +178,6 @@ class ConnectionPreferences:
 
     def _build(self) -> Gtk.Widget:
         """Embedded full-column settings page (not a floating dialog)."""
-        _ensure_preferences_css()
         toolbar = Adw.ToolbarView()
         toolbar.add_css_class("chickenbutt-settings-panel")
         toolbar.set_hexpand(True)

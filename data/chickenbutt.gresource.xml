@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <!-- Resource base path matches Gio.Application default for APP_ID
+       io.github.pixelhackstudios.ChickenButt so Adw.Application finds
+       style.css / style-dark.css at the base path. -->
+  <gresource prefix="/io/github/pixelhackstudios/ChickenButt">
+    <file alias="style.css">style/style.css</file>
+    <file alias="style-dark.css">style/style-dark.css</file>
+    <file alias="style-hc.css">style/style-hc.css</file>
+    <file alias="style-hc-dark.css">style/style-hc-dark.css</file>
+  </gresource>
+</gresources>

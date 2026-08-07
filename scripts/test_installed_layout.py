@@ -93,6 +93,7 @@ REQUIRED_RESOURCES = [
     "vendor/mistune/__init__.py",
     "icons/chickenbutt-light-icon.svg",
     "icons/chickenbutt-dark-icon.svg",
+    "chickenbutt-resources.gresource",
 ]
 
 FORBIDDEN_TOP_LEVEL = [

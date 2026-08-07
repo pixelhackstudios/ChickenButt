@@ -13,6 +13,9 @@ flatpak-repo/
 dist-flatpak/
 *.flatpak
 
+# Compiled GResource (built by meson / glib-compile-resources)
+*.gresource
+
 # App runtime data (created next to the repo, but ignore just in case)
 *.db
 *.sqlite3

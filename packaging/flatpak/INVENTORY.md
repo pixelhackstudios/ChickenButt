@@ -128,21 +128,19 @@ host theme trees (`~/.themes`, `/usr/share/themes`).
 
 ### Theming / light–dark (Flatpak)
 
-**What working GNOME-runtime Flatpaks do:** load a base theme that exists in
-the sandbox, follow the desktop color-scheme via libadwaita, style with named
-colors (`@window_bg_color`, etc.), brand only accents / custom surfaces.
+Standard libadwaita application styling (GNOME HIG / Adw.Application docs):
 
-**What breaks on Ubuntu:** host/portal injects `GTK_THEME=Yaru-*`. Yaru GTK4
-CSS is a gresource **not** in `org.gnome.Platform`, so theme load fails and
-token colors are wrong. That is not fixed by dual custom light/dark CSS.
-
-**ChickenButt:**
-- `GTK_THEME=Adwaita` under Flatpak (manifest, launcher, `main.py` when
-  `FLATPAK_ID` is set) — sandbox theme availability, **not** product branding.
+- `Adw.Application` auto-loads GResource stylesheets at the app resource base
+  path: `style.css`, `style-dark.css`, `style-hc.css`, `style-hc-dark.css`.
+- Bundle: `data/chickenbutt.gresource.xml` → meson `gnome.compile_resources`
+  → installed next to Python modules; `main.py` registers it before startup.
+- Brand only: override libadwaita CSS variables (`--accent-bg-color`,
+  `--window-bg-color`, sidebar tokens, …) to match the WebKit transcript
+  palette and gold accent. Layout classes use `var(--…)` — not a second theme
+  engine.
 - `Adw.StyleManager` `COLOR_SCHEME_DEFAULT` for system light/dark.
-- Shell CSS uses libadwaita tokens; gold accent + WebKit transcript own brand.
-- WebKit gets `theme_changed` from `StyleManager.get_dark()`.
-- No host theme mounts, no inventing a Yaru Flatpak theme extension.
+- WebKit receives `theme_changed` from `StyleManager.get_dark()`.
+- No `GTK_THEME` force, no host theme mounts, no Yaru Flatpak theme extension.
 
 ## Architecture
 

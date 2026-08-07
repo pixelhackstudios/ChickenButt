@@ -25,9 +25,6 @@ finish-args:
   - --socket=session-bus
   - --talk-name=org.kde.StatusNotifierWatcher
   - --own-name=org.kde.StatusNotifierItem.*
-  # Sandbox only: host GTK_THEME=Yaru-* has no gresource here. Light/dark still
-  # follows the desktop color-scheme via libadwaita. Brand is app CSS + WebKit.
-  - --env=GTK_THEME=Adwaita
 
 cleanup:
   - /include

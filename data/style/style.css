@@ -1,0 +1,423 @@
+/* ChickenButt application stylesheet (loaded by Adw.Application).
+ *
+ * Always-on rules. Libadwaita owns widget feel, light/dark switching,
+ * high contrast, and state styles. We only set brand tokens and app
+ * layout classes. See also style-dark.css.
+ */
+
+/* ---- Brand tokens (light defaults; dark overrides in style-dark.css) ---- */
+:root {
+  --accent-bg-color: #c9a227;
+  --accent-fg-color: #1a1a12;
+  --accent-color: #c9a227;
+
+  /* Match WebKit transcript light palette */
+  --window-bg-color: #f4f4f6;
+  --window-fg-color: #1c1c1e;
+  --view-bg-color: #f4f4f6;
+  --view-fg-color: #1c1c1e;
+  --headerbar-bg-color: #f4f4f6;
+  --headerbar-fg-color: #1c1c1e;
+  --headerbar-backdrop-color: #f4f4f6;
+  --sidebar-bg-color: #ececf0;
+  --sidebar-fg-color: #1c1c1e;
+  --sidebar-backdrop-color: #e8e8ec;
+  --dialog-bg-color: #f4f4f6;
+  --dialog-fg-color: #1c1c1e;
+}
+
+/* ---- Surfaces ---- */
+.chat-surface {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
+}
+
+.chat-sidebar {
+  background-color: var(--sidebar-bg-color);
+  color: var(--sidebar-fg-color);
+  border-right: 1px solid var(--border-color);
+}
+
+.chat-sidebar-header {
+  border-bottom: 1px solid var(--border-color);
+  padding: 6px 8px 6px 12px;
+  min-height: 40px;
+}
+
+.chat-sidebar-footer {
+  border-top: 1px solid var(--border-color);
+  padding: 6px 8px;
+  min-height: 40px;
+}
+
+.chat-sidebar-model-block {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.chickenbutt-settings-panel,
+.chickenbutt-settings-panel headerbar {
+  background-color: var(--window-bg-color);
+  color: var(--window-fg-color);
+}
+
+.chickenbutt-settings-panel headerbar {
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+
+.chickenbutt-settings-panel adw-view-switcher {
+  margin-top: 2px;
+}
+
+.chat-list {
+  background: transparent;
+}
+
+/* ---- empty state ---- */
+.empty-state {
+  opacity: 0.95;
+}
+
+.empty-title {
+  font-size: 1.15em;
+  font-weight: 700;
+  margin-top: 10px;
+  color: color-mix(in srgb, var(--window-fg-color) 88%, transparent);
+}
+
+.empty-sub {
+  opacity: 0.55;
+  margin-top: 18px;
+  color: color-mix(in srgb, var(--window-fg-color) 70%, transparent);
+}
+
+.empty-icon {
+  opacity: 0.92;
+  margin-bottom: 6px;
+  min-width: 64px;
+  min-height: 64px;
+}
+
+/* ---- message row / bubbles (native transcript fallback) ---- */
+.msg-row {
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.msg-row-user {
+  margin-left: 24px;
+}
+
+.msg-row-assistant {
+  margin-right: 0;
+}
+
+.chat-bubble {
+  border-radius: 16px;
+  padding: 10px 14px;
+  min-width: 40px;
+  font-size: 15px;
+}
+
+.chat-user {
+  background-color: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+  border-bottom-right-radius: 0;
+  box-shadow: 0 1px 3px color-mix(in srgb, black 18%, transparent);
+}
+
+.chat-assistant {
+  background-color: transparent;
+  color: color-mix(in srgb, var(--window-fg-color) 92%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.chat-error {
+  background-color: color-mix(in srgb, var(--error-bg-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error-color) 35%, transparent);
+}
+
+.chat-body {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.chat-user .chat-body {
+  color: var(--accent-fg-color);
+}
+
+.chat-meta {
+  font-size: 0.7em;
+  opacity: 0.45;
+  margin-top: 3px;
+  margin-left: 4px;
+  margin-right: 4px;
+  color: color-mix(in srgb, var(--window-fg-color) 70%, transparent);
+}
+
+.chat-user-meta {
+  opacity: 0.55;
+  color: color-mix(in srgb, var(--window-fg-color) 75%, transparent);
+}
+
+.typing-dots {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.55;
+}
+
+.reasoning-expander {
+  margin: 0 0 8px 0;
+  padding: 4px 0;
+}
+
+.reasoning-body {
+  padding: 4px 12px 12px 12px;
+}
+
+/* ---- sidebar model / history ---- */
+.chat-sidebar-model {
+  padding: 4px 12px 10px 12px;
+}
+
+.chat-sidebar-model dropdown {
+  min-height: 38px;
+  border-radius: 10px;
+}
+
+.chat-sidebar-title {
+  font-weight: 700;
+  font-size: 0.95em;
+}
+
+.chat-sidebar-section {
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.55;
+  margin: 8px 14px 4px 14px;
+  letter-spacing: 0.02em;
+}
+
+.chat-sidebar list {
+  background: transparent;
+}
+
+.chat-sidebar row {
+  border-radius: 10px;
+  margin: 1px 8px;
+  padding: 0;
+  min-height: 0;
+}
+
+.chat-sidebar row:hover {
+  background-color: color-mix(in srgb, var(--window-fg-color) 6%, transparent);
+}
+
+.chat-sidebar row:selected {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 22%, transparent);
+}
+
+.chat-sidebar-row-title {
+  font-weight: 500;
+  font-size: 0.92em;
+}
+
+.chat-sidebar-row-active {
+  font-weight: 700;
+}
+
+.chat-sidebar-row-meta {
+  font-size: 0.75em;
+  opacity: 0.5;
+}
+
+.chat-sidebar-row-actions {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chat-sidebar row:hover .chat-sidebar-row-actions,
+.chat-sidebar row:selected .chat-sidebar-row-actions,
+.chat-sidebar-row-actions:focus-within {
+  opacity: 1;
+}
+
+.chat-sidebar-row-actions button {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+/* ---- composer ---- */
+.composer-bar {
+  background-color: transparent;
+  background-image: none;
+  padding: 6px 12px 16px 12px;
+  border-top: none;
+}
+
+.composer-shell {
+  background-color: color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--window-fg-color) 12%, transparent);
+  padding: 4px 4px 4px 12px;
+  box-shadow: 0 4px 18px color-mix(in srgb, black 12%, transparent),
+    0 1px 3px color-mix(in srgb, black 8%, transparent);
+}
+
+.composer-shell:focus-within {
+  border-color: color-mix(in srgb, var(--accent-bg-color) 55%, transparent);
+  background-color: color-mix(in srgb, var(--window-fg-color) 10%, transparent);
+  box-shadow: 0 6px 22px color-mix(in srgb, black 16%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent-bg-color) 15%, transparent);
+}
+
+.composer-input {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 0.95em;
+}
+
+.composer-input textview,
+.composer-input text {
+  background: transparent;
+  color: color-mix(in srgb, var(--window-fg-color) 92%, transparent);
+}
+
+.composer-scroll {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  min-width: 0;
+}
+
+.composer-scroll > scrollbar {
+  margin: 0;
+}
+
+.composer-hint {
+  font-size: 0.72em;
+  opacity: 0.42;
+  color: color-mix(in srgb, var(--window-fg-color) 70%, transparent);
+  margin-bottom: 8px;
+  transition: opacity 280ms ease;
+}
+
+.composer-hint.faded {
+  opacity: 0;
+}
+
+.composer-meta-row {
+  margin-top: 4px;
+  margin-left: 6px;
+  margin-right: 6px;
+  min-height: 0;
+}
+
+.composer-char-count {
+  font-size: 0.72em;
+  opacity: 0.55;
+  color: color-mix(in srgb, var(--window-fg-color) 70%, transparent);
+}
+
+.composer-char-count.warning {
+  opacity: 0.9;
+  color: var(--warning-color);
+}
+
+/* Send uses real .suggested-action; only size/shape here (accent from :root) */
+.send-btn {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.stop-btn {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+/* ---- header ---- */
+.header-title {
+  font-weight: 700;
+}
+
+.header-sub {
+  font-size: 0.78em;
+  opacity: 0.6;
+}
+
+/* ---- model load overlay ---- */
+.load-overlay {
+  background-color: color-mix(in srgb, black 62%, transparent);
+}
+
+.load-card {
+  background-color: color-mix(in srgb, var(--window-bg-color) 97%, transparent);
+  border-radius: 18px;
+  padding: 28px 32px;
+  min-width: 280px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 12px 40px color-mix(in srgb, black 45%, transparent);
+}
+
+.load-title {
+  font-size: 1.05em;
+  font-weight: 700;
+}
+
+.load-model {
+  font-size: 0.95em;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.load-status {
+  font-size: 0.82em;
+  opacity: 0.55;
+  margin-top: 10px;
+}
+
+.load-progress {
+  margin-top: 14px;
+  min-width: 220px;
+}
+
+/* ---- Ollama health banner ---- */
+.health-banner {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-bg-color) 28%, transparent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.health-banner.error {
+  background-color: color-mix(in srgb, var(--error-bg-color) 12%, transparent);
+  border-color: color-mix(in srgb, var(--error-color) 35%, transparent);
+}
+
+.health-banner.warn {
+  background-color: color-mix(in srgb, var(--warning-bg-color) 14%, transparent);
+  border-color: color-mix(in srgb, var(--warning-color) 35%, transparent);
+}
+
+.health-banner-title {
+  font-weight: 700;
+  font-size: 0.95em;
+}
+
+.health-banner-detail {
+  font-size: 0.85em;
+  opacity: 0.85;
+  margin-top: 2px;
+}
