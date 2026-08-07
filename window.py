@@ -95,8 +95,8 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
         pass
 
 
-# Shell styling: data/style/style.css (+ style-dark.css) via Adw.Application
-# GResource. Do not add manual CssProviders for light/dark here.
+# Shell styling: data/style/style.css via Adw.Application GResource.
+# Window classes chickenbutt-dark/light brand our surfaces (not global tokens).
 
 GREETING_TEXT = "What's up, ChickenButt?"
 GREETING_SUB = (
@@ -113,6 +113,13 @@ def _is_ephemeral_greeting(role: str, content: str) -> bool:
 class ChatSidebar(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application, client: OllamaClient | None = None):
         super().__init__(application=app, title="ChickenButt")
+        self.sync_appearance()
+        try:
+            Adw.StyleManager.get_default().connect(
+                "notify::dark", lambda *_: self.sync_appearance()
+            )
+        except Exception:  # noqa: BLE001
+            pass
         self._model_profiles = ModelProfileService(
             settings_dir=_SETTINGS_DIR,
             settings_path=_SETTINGS_PATH,
@@ -188,6 +195,8 @@ class ChatSidebar(Adw.ApplicationWindow):
         if self._requested_transcript_mode == "native":
             ensure_md_css()
         self._build_ui()
+        # Class may have been set before content existed; re-apply after tree build.
+        self.sync_appearance()
         del self._requested_transcript_mode
         self._model_session = ModelLoadController(
             client=self.client,
@@ -504,6 +513,30 @@ class ChatSidebar(Adw.ApplicationWindow):
             return
         try:
             self.input.grab_focus()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def sync_appearance(self) -> None:
+        """Brand shell surfaces from StyleManager; force a layout pass.
+
+        Portal light/dark can settle after first map. Re-run on idle/timeouts
+        so cold start matches the post-toggle state users were forced into.
+        """
+        try:
+            dark = bool(Adw.StyleManager.get_default().get_dark())
+        except Exception:  # noqa: BLE001
+            dark = True
+        self.remove_css_class("chickenbutt-light")
+        self.remove_css_class("chickenbutt-dark")
+        self.add_css_class("chickenbutt-dark" if dark else "chickenbutt-light")
+        try:
+            self.queue_resize()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            adapter = getattr(self, "_transcript", None)
+            if adapter is not None and hasattr(adapter, "set_theme_dark"):
+                adapter.set_theme_dark(dark)
         except Exception:  # noqa: BLE001
             pass
 

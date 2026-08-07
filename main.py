@@ -11,6 +11,23 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
+
+def _prepare_flatpak_gtk_theme() -> None:
+    """Stop host Yaru GTK theme names from loading inside the Flatpak sandbox.
+
+    Ubuntu portals inject gtk-theme=Yaru-*. Those themes are not in
+    org.gnome.Platform, so first paint is wrong until something forces a
+    style refresh (e.g. toggling GNOME light/dark). Adwaita here is the
+    sandbox GTK base only — not product branding. Brand is style.css accent
+    + chat-surface classes + WebKit.
+    """
+    if not os.environ.get("FLATPAK_ID"):
+        return
+    os.environ["GTK_THEME"] = "Adwaita"
+
+
+_prepare_flatpak_gtk_theme()
+
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -31,8 +48,7 @@ _GRESOURCE_NAME = "chickenbutt-resources.gresource"
 def _register_app_resources() -> None:
     """Register application GResource so Adw.Application can load style.css.
 
-    Must run before Adw.Application startup (auto-loads style.css from the
-    resource base path; light/dark via prefers-color-scheme media queries).
+    Must run before Adw.Application startup (auto-loads style.css).
     """
     candidates = (
         os.path.join(APP_DIR, _GRESOURCE_NAME),
@@ -136,17 +152,28 @@ class ChickenButtApp(Adw.Application):
             else:
                 print("Tray ready — click for Show / Hide / Exit.", flush=True)
             self.window.present()
-            GLib.idle_add(self._focus_input)
+            # Portal color-scheme / theme can arrive after first map; resync
+            # shell class + layout so cold start matches a post-toggle state.
+            GLib.idle_add(self._post_present_sync)
+            GLib.timeout_add(150, self._post_present_sync)
+            GLib.timeout_add(400, self._post_present_sync)
         else:
             self._show_window()
 
-    def _focus_input(self) -> bool:
+    def _post_present_sync(self) -> bool:
         if self.window is not None:
+            try:
+                self.window.sync_appearance()
+            except Exception:  # noqa: BLE001
+                pass
             try:
                 self.window.input.grab_focus()
             except Exception:  # noqa: BLE001
                 pass
         return False
+
+    def _focus_input(self) -> bool:
+        return self._post_present_sync()
 
     def _resolve_tray_chat_icon(self) -> str:
         """Pick a chat-bubble style symbolic for the GNOME top-bar indicator."""

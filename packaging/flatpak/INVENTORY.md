@@ -128,20 +128,16 @@ host theme trees (`~/.themes`, `/usr/share/themes`).
 
 ### Theming / light–dark (Flatpak)
 
-Standard libadwaita application styling (GNOME HIG / Adw.Application docs):
-
-- Single GResource `style.css` at the app resource base path (Adw.Application
-  auto-load). Light/dark brand tokens use `@media (prefers-color-scheme: …)`
-  so libadwaita can set the provider scheme and first paint is correct.
-  Do **not** use deprecated `style-dark.css` / `style-hc*.css` split files.
-- Bundle: `data/chickenbutt.gresource.xml` → meson `gnome.compile_resources`
-  → installed next to Python modules; `main.py` registers it before startup.
-- Brand only: override libadwaita CSS variables (`--accent-bg-color`,
-  `--window-bg-color`, sidebar tokens) to match the WebKit transcript and gold
-  accent. Layout/geometry rules are outside media queries so they always apply.
-- `Adw.StyleManager` `COLOR_SCHEME_DEFAULT` for system light/dark.
-- WebKit: CSS media queries + `theme_changed` from `StyleManager.get_dark()`.
-- No `GTK_THEME` force, no host theme mounts, no Yaru Flatpak theme extension.
+- `GTK_THEME=Adwaita` under Flatpak only: host/portal `Yaru-*` has no GTK4
+  gresource in `org.gnome.Platform`; without this, cold start is broken until
+  the user toggles GNOME light/dark. This is sandbox theme availability, not
+  product branding.
+- GResource `style.css` via Adw.Application: gold `--accent-*` + layout geometry.
+- Brand surfaces (chat column / sidebar) use window classes
+  `chickenbutt-dark` / `chickenbutt-light` from `StyleManager.get_dark()`,
+  applied before present and re-synced after portal settle (idle + short delays).
+- WebKit: `theme_changed` from the same dark boolean (+ CSS media defaults).
+- No host theme mounts, no Yaru theme extension.
 
 ## Architecture
 

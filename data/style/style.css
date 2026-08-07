@@ -1,74 +1,23 @@
-/* ChickenButt — Adw.Application style.css (single file).
+/* ChickenButt Adw.Application style.css
  *
- * Libadwaita sets prefers-color-scheme on this CssProvider and owns widget
- * chrome. We only set brand tokens + layout classes.
- *
- * Do NOT use style-dark.css (deprecated since libadwaita 1.9).
- * Do NOT put light-only colors outside a light media query (breaks first paint
- * when the system is dark until the next StyleManager notify).
+ * Libadwaita owns system chrome (headerbar, buttons, menus, light/dark).
+ * We only: (1) gold accent, (2) layout geometry, (3) brand paints on OUR
+ * custom classes under .chickenbutt-dark / .chickenbutt-light (set from
+ * StyleManager.get_dark() in Python — never @media on custom providers).
  */
 
-/* ---- Brand accent (always) ---- */
+/* ---- Accent (real .suggested-action uses these) ---- */
 :root {
   --accent-bg-color: #c9a227;
   --accent-fg-color: #1a1a12;
   --accent-color: #c9a227;
 }
 
-/* ---- Surface brand: light ---- */
-@media (prefers-color-scheme: light) {
-  :root {
-    --window-bg-color: #f4f4f6;
-    --window-fg-color: #1c1c1e;
-    --view-bg-color: #f4f4f6;
-    --view-fg-color: #1c1c1e;
-    --headerbar-bg-color: #f4f4f6;
-    --headerbar-fg-color: #1c1c1e;
-    --headerbar-backdrop-color: #f4f4f6;
-    --sidebar-bg-color: #ececf0;
-    --sidebar-fg-color: #1c1c1e;
-    --sidebar-backdrop-color: #e8e8ec;
-    --dialog-bg-color: #f4f4f6;
-    --dialog-fg-color: #1c1c1e;
-    --popover-bg-color: #ffffff;
-    --popover-fg-color: #1c1c1e;
-  }
-}
-
-/* ---- Surface brand: dark (matches WebKit transcript) ---- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --window-bg-color: #121216;
-    --window-fg-color: #e8e8ed;
-    --view-bg-color: #121216;
-    --view-fg-color: #e8e8ed;
-    --headerbar-bg-color: #121216;
-    --headerbar-fg-color: #e8e8ed;
-    --headerbar-backdrop-color: #121216;
-    --sidebar-bg-color: #16161c;
-    --sidebar-fg-color: #e8e8ed;
-    --sidebar-backdrop-color: #141418;
-    --dialog-bg-color: #16161c;
-    --dialog-fg-color: #e8e8ed;
-    --popover-bg-color: #1c1c22;
-    --popover-fg-color: #e8e8ed;
-    --card-bg-color: rgba(255, 255, 255, 0.08);
-    --card-fg-color: #e8e8ed;
-  }
-}
-
 /* ============================================================
-   Layout geometry — always active (never gated on color-scheme)
+   Geometry — always, no color dependency
    ============================================================ */
 
-.chat-surface {
-  background-color: var(--window-bg-color);
-  color: var(--window-fg-color);
-}
-
 .chat-sidebar {
-  background-color: var(--sidebar-bg-color);
-  color: var(--sidebar-fg-color);
   border-right: 1px solid rgba(128, 128, 128, 0.25);
 }
 
@@ -161,12 +110,6 @@
   padding: 0;
 }
 
-.chickenbutt-settings-panel,
-.chickenbutt-settings-panel headerbar {
-  background-color: var(--window-bg-color);
-  color: var(--window-fg-color);
-}
-
 .chickenbutt-settings-panel headerbar {
   padding-top: 10px;
   padding-bottom: 8px;
@@ -180,7 +123,6 @@
   background: transparent;
 }
 
-/* empty state */
 .empty-state {
   opacity: 0.95;
 }
@@ -203,7 +145,6 @@
   min-height: 64px;
 }
 
-/* native transcript bubbles (fallback path) */
 .msg-row {
   margin-top: 2px;
   margin-bottom: 2px;
@@ -262,7 +203,6 @@
   padding: 4px 12px 12px 12px;
 }
 
-/* composer */
 .composer-bar {
   background-color: transparent;
   background-image: none;
@@ -335,7 +275,6 @@
   border-radius: 999px;
 }
 
-/* header */
 .header-title {
   font-weight: 700;
 }
@@ -345,7 +284,6 @@
   opacity: 0.6;
 }
 
-/* model load overlay */
 .load-overlay {
   background-color: rgba(0, 0, 0, 0.62);
 }
@@ -380,7 +318,6 @@
   min-width: 220px;
 }
 
-/* health banner */
 .health-banner {
   background-color: rgba(201, 162, 39, 0.12);
   border: 1px solid rgba(201, 162, 39, 0.28);
@@ -409,4 +346,32 @@
   font-size: 0.85em;
   opacity: 0.85;
   margin-top: 2px;
+}
+
+/* ============================================================
+   Brand surfaces on OUR widgets only (not global :root tokens).
+   Python sets .chickenbutt-dark / .chickenbutt-light on the window
+   from StyleManager.get_dark() before present() and on notify::dark.
+   ============================================================ */
+
+.chickenbutt-dark .chat-surface,
+.chickenbutt-dark .chickenbutt-settings-panel {
+  background-color: #121216;
+  color: #e8e8ed;
+}
+
+.chickenbutt-dark .chat-sidebar {
+  background-color: #16161c;
+  color: #e8e8ed;
+}
+
+.chickenbutt-light .chat-surface,
+.chickenbutt-light .chickenbutt-settings-panel {
+  background-color: #f4f4f6;
+  color: #1c1c1e;
+}
+
+.chickenbutt-light .chat-sidebar {
+  background-color: #ececf0;
+  color: #1c1c1e;
 }

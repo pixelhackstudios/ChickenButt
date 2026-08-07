@@ -135,8 +135,17 @@ class WebTranscriptView(Gtk.Box):
     def _on_theme(self, sm: Adw.StyleManager, *_args) -> None:
         self._apply_theme(sm.get_dark())
 
-    def _apply_theme(self, dark: bool) -> None:
+    def set_theme_dark(self, dark: bool) -> None:
+        """Apply transcript palette; safe to call before/after page ready."""
         self.post({"type": "theme_changed", "theme": "dark" if dark else "light"})
+        try:
+            self.queue_resize()
+            self._view.queue_resize()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _apply_theme(self, dark: bool) -> None:
+        self.set_theme_dark(dark)
 
     def _launch_external_default(self, uri: str) -> None:
         try:

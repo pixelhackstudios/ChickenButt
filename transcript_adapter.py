@@ -115,6 +115,13 @@ class TranscriptAdapter:
         if self._web is not None:
             self._web.post(event)
 
+    def set_theme_dark(self, dark: bool) -> None:
+        """Push light/dark to WebKit (or no-op for native)."""
+        if self._web is not None and hasattr(self._web, "set_theme_dark"):
+            self._web.set_theme_dark(dark)  # type: ignore[attr-defined]
+        elif self._web is not None:
+            self.post({"type": "theme_changed", "theme": "dark" if dark else "light"})
+
     def render_empty(self) -> None:
         """Render the empty surface without changing the native row map."""
         if self._web is not None:
