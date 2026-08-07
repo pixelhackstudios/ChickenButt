@@ -1,10 +1,7 @@
-# Flatpak notes (appearance)
+# Flatpak notes
 
-ChickenButt does not ship an application color theme.
+Runtime: `org.gnome.Platform//50`. Session bus for portals + tray.
 
-- Session bus is granted so the Settings portal can provide `color-scheme`.
-- `Adw.StyleManager` uses `DEFAULT` (follow desktop prefer-dark / prefer-light).
-- Layout CSS may exist; it must not invent light/dark palettes.
-- WebKit transcript follows `StyleManager.get_dark()` for readable text only.
-
-Same boring model as other Flathub libadwaita apps.
+Appearance: follow the desktop via libadwaita (no app theme product). Layout
+and chrome use Adwaita CSS color tokens (`@window_bg_color`, etc.) so light
+and dark track the session. No `GTK_THEME` force and no host theme mounts.

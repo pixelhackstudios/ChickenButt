@@ -25,8 +25,6 @@ finish-args:
   - --socket=session-bus
   - --talk-name=org.kde.StatusNotifierWatcher
   - --own-name=org.kde.StatusNotifierItem.*
-  # Appearance: session-bus → Settings portal → libadwaita light/dark.
-  # No custom theme, no GTK_THEME, no host theme mounts.
 
 cleanup:
   - /include

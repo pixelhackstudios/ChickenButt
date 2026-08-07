@@ -24,59 +24,10 @@ from release_info import APP_ID, APP_NAME, VERSION
 from tray import TrayIcon
 from window import ChatSidebar
 
-# GResource from meson (layout CSS only; no app color theme)
-_GRESOURCE_NAME = "chickenbutt-resources.gresource"
-
-
-def _register_app_resources() -> None:
-    """Register GResource so Adw.Application can load layout style.css."""
-    candidates = (
-        os.path.join(APP_DIR, _GRESOURCE_NAME),
-        os.path.join(APP_DIR, "data", _GRESOURCE_NAME),
-        os.path.join(APP_DIR, "build", _GRESOURCE_NAME),
-    )
-    for path in candidates:
-        if not os.path.isfile(path):
-            continue
-        try:
-            Gio.resources_register(Gio.Resource.load(path))
-            return
-        except GLib.Error as exc:
-            print(f"gresource load failed ({path}): {exc}", flush=True)
-    xml_path = os.path.join(APP_DIR, "data", "chickenbutt.gresource.xml")
-    if os.path.isfile(xml_path):
-        out_path = os.path.join(APP_DIR, "data", _GRESOURCE_NAME)
-        try:
-            import subprocess
-
-            subprocess.run(
-                [
-                    "glib-compile-resources",
-                    f"--sourcedir={os.path.join(APP_DIR, 'data')}",
-                    f"--target={out_path}",
-                    xml_path,
-                ],
-                check=True,
-                capture_output=True,
-            )
-            Gio.resources_register(Gio.Resource.load(out_path))
-            return
-        except (OSError, subprocess.CalledProcessError, GLib.Error) as exc:
-            print(f"gresource compile/load fallback failed: {exc}", flush=True)
-    print("warning: no chickenbutt GResource found", flush=True)
-
 
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # Follow the desktop light/dark preference (libadwaita default).
-        # Do not invent an app theme or set GTK_THEME.
-        try:
-            Adw.StyleManager.get_default().set_color_scheme(
-                Adw.ColorScheme.DEFAULT
-            )
-        except Exception:  # noqa: BLE001
-            pass
         self.window: ChatSidebar | None = None
         self.tray: TrayIcon | None = None
         self.connect("activate", self._on_activate)
@@ -104,6 +55,8 @@ class ChickenButtApp(Adw.Application):
             self.window.set_close_handler(self._on_window_close)
             self.window.connect("notify::visible", self._on_window_visible)
 
+            # Panel/tray: system chat-bubble symbolic (not the brand chicken —
+            # the chick stays on the empty state / app icon / dock).
             tray_icon = self._resolve_tray_chat_icon()
 
             self.tray = TrayIcon(
@@ -139,6 +92,7 @@ class ChickenButtApp(Adw.Application):
         return False
 
     def _resolve_tray_chat_icon(self) -> str:
+        """Pick a chat-bubble style symbolic for the GNOME top-bar indicator."""
         candidates = (
             "chat-bubbles-empty-symbolic",
             "chat-bubble-text-symbolic",
@@ -193,7 +147,6 @@ def main() -> int:
     if "--version" in sys.argv[1:]:
         print(f"{APP_NAME} {VERSION}")
         return 0
-    _register_app_resources()
     Adw.init()
     GLib.set_application_name(APP_NAME)
     GLib.set_prgname(APP_NAME)
