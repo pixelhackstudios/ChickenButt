@@ -21,6 +21,11 @@ jobs:
       # tests actually verify (CSP/sanitization/navigation-policy behavior
       # at the JS/DOM level, not the OS sandbox itself).
       WEBKIT_DISABLE_SANDBOX: "1"
+      # Suppress accessibility-bus and hardware-GL noise on hosted runners
+      # (avoids a11y GDBus spam and libEGL DRI3 warnings that can obscure
+      # real failures or contribute to flaky non-zero exits).
+      NO_AT_BRIDGE: "1"
+      LIBGL_ALWAYS_SOFTWARE: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +52,19 @@ jobs:
             status=0
             for f in scripts/test_*.py; do
               echo "::group::$f"
-              python3 "$f" || status=1
+              tmp=$(mktemp)
+              if python3 "$f" >"$tmp" 2>&1; then
+                cat "$tmp"
+                rm -f "$tmp"
+              else
+                rc=$?
+                echo "==== $f FAILED with exit code $rc ===="
+                tail -n 500 "$tmp" >&2 || true
+                rm -f "$tmp"
+                echo "::endgroup::"
+                echo "::error:: Test $f failed (exit code $rc)"
+                exit $rc
+              fi
               echo "::endgroup::"
             done
             exit $status
