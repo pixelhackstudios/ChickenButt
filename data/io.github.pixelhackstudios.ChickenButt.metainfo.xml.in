@@ -48,7 +48,12 @@
   </screenshots>
 
   <releases>
-    <release version="@VERSION@" date="2026-08-06">
+    <release version="@VERSION@" date="2026-08-07">
+      <description>
+        <p>Version 0.1.3: Flatpak no longer tries to load unavailable host Yaru GTK theme resources; follows system light/dark via Adwaita/libadwaita. Includes reasoning transcript from 0.1.2.</p>
+      </description>
+    </release>
+    <release version="0.1.2" date="2026-08-06">
       <description>
         <p>Version 0.1.2: Reasoning/thinking transcript support with Show reasoning toggle, persistence and Ollama history, Continue/regenerate handling, and SQLite v1→v2 migration.</p>
       </description>
