@@ -11,23 +11,6 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-
-def _prepare_flatpak_gtk_theme() -> None:
-    """Stop host Yaru GTK theme names from loading inside the Flatpak sandbox.
-
-    Ubuntu portals inject gtk-theme=Yaru-*. Those themes are not in
-    org.gnome.Platform, so first paint is wrong until something forces a
-    style refresh (e.g. toggling GNOME light/dark). Adwaita here is the
-    sandbox GTK base only — not product branding. Brand is style.css accent
-    + chat-surface classes + WebKit.
-    """
-    if not os.environ.get("FLATPAK_ID"):
-        return
-    os.environ["GTK_THEME"] = "Adwaita"
-
-
-_prepare_flatpak_gtk_theme()
-
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -41,18 +24,14 @@ from release_info import APP_ID, APP_NAME, VERSION
 from tray import TrayIcon
 from window import ChatSidebar
 
-# GResource filename produced by meson gnome.compile_resources(..., gresource_bundle: true)
+# GResource from meson (layout CSS only; no app color theme)
 _GRESOURCE_NAME = "chickenbutt-resources.gresource"
 
 
 def _register_app_resources() -> None:
-    """Register application GResource so Adw.Application can load style.css.
-
-    Must run before Adw.Application startup (auto-loads style.css).
-    """
+    """Register GResource so Adw.Application can load layout style.css."""
     candidates = (
         os.path.join(APP_DIR, _GRESOURCE_NAME),
-        # Uninstalled: meson build dir next to sources is uncommon; also try data/
         os.path.join(APP_DIR, "data", _GRESOURCE_NAME),
         os.path.join(APP_DIR, "build", _GRESOURCE_NAME),
     )
@@ -60,12 +39,10 @@ def _register_app_resources() -> None:
         if not os.path.isfile(path):
             continue
         try:
-            resource = Gio.Resource.load(path)
-            Gio.resources_register(resource)
+            Gio.resources_register(Gio.Resource.load(path))
             return
         except GLib.Error as exc:
             print(f"gresource load failed ({path}): {exc}", flush=True)
-    # Dev fallback: compile from XML if glib-compile-resources is available
     xml_path = os.path.join(APP_DIR, "data", "chickenbutt.gresource.xml")
     if os.path.isfile(xml_path):
         out_path = os.path.join(APP_DIR, "data", _GRESOURCE_NAME)
@@ -82,21 +59,17 @@ def _register_app_resources() -> None:
                 check=True,
                 capture_output=True,
             )
-            resource = Gio.Resource.load(out_path)
-            Gio.resources_register(resource)
+            Gio.resources_register(Gio.Resource.load(out_path))
             return
         except (OSError, subprocess.CalledProcessError, GLib.Error) as exc:
             print(f"gresource compile/load fallback failed: {exc}", flush=True)
-    print(
-        "warning: no chickenbutt GResource found; Adw style.css not loaded",
-        flush=True,
-    )
+    print("warning: no chickenbutt GResource found", flush=True)
 
 
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # Follow system light/dark / high-contrast via libadwaita.
+        # Follow the desktop light/dark preference. No app-level theme override.
         try:
             Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.DEFAULT)
         except Exception:  # noqa: BLE001
@@ -128,8 +101,6 @@ class ChickenButtApp(Adw.Application):
             self.window.set_close_handler(self._on_window_close)
             self.window.connect("notify::visible", self._on_window_visible)
 
-            # Panel/tray: system chat-bubble symbolic (not the brand chicken —
-            # the chick stays on the empty state / app icon / dock).
             tray_icon = self._resolve_tray_chat_icon()
 
             self.tray = TrayIcon(
@@ -152,31 +123,19 @@ class ChickenButtApp(Adw.Application):
             else:
                 print("Tray ready — click for Show / Hide / Exit.", flush=True)
             self.window.present()
-            # Portal color-scheme / theme can arrive after first map; resync
-            # shell class + layout so cold start matches a post-toggle state.
-            GLib.idle_add(self._post_present_sync)
-            GLib.timeout_add(150, self._post_present_sync)
-            GLib.timeout_add(400, self._post_present_sync)
+            GLib.idle_add(self._focus_input)
         else:
             self._show_window()
 
-    def _post_present_sync(self) -> bool:
+    def _focus_input(self) -> bool:
         if self.window is not None:
-            try:
-                self.window.sync_appearance()
-            except Exception:  # noqa: BLE001
-                pass
             try:
                 self.window.input.grab_focus()
             except Exception:  # noqa: BLE001
                 pass
         return False
 
-    def _focus_input(self) -> bool:
-        return self._post_present_sync()
-
     def _resolve_tray_chat_icon(self) -> str:
-        """Pick a chat-bubble style symbolic for the GNOME top-bar indicator."""
         candidates = (
             "chat-bubbles-empty-symbolic",
             "chat-bubble-text-symbolic",
@@ -231,7 +190,6 @@ def main() -> int:
     if "--version" in sys.argv[1:]:
         print(f"{APP_NAME} {VERSION}")
         return 0
-    # GResource before Adw.Application startup loads style.css automatically.
     _register_app_resources()
     Adw.init()
     GLib.set_application_name(APP_NAME)

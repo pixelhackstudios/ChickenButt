@@ -1,31 +1,30 @@
+/* System light/dark only — no ChickenButt brand palette. */
 :root {
-  /* Dark defaults; media query + body.theme-* correct first paint and bridge. */
-  --bg: #121216;
-  --fg: #e8e8ed;
-  --muted: rgba(255, 255, 255, 0.55);
-  --bubble-user: #22222c;
-  --bubble-user-fg: #dfdfdf;
-  --bubble-assistant: rgba(255, 255, 255, 0.08);
-  --code-bg: #1a1b22;
-  --code-header: #22232c;
-  --accent: #c9a227;
+  --bg: #ffffff;
+  --fg: #1c1c1e;
+  --muted: rgba(0, 0, 0, 0.55);
+  --bubble-user: #e8e8ed;
+  --bubble-user-fg: #1c1c1e;
+  --bubble-assistant: rgba(0, 0, 0, 0.06);
+  --code-bg: #f0f0f4;
+  --code-header: #e4e4ea;
+  --accent: #3584e4;
   --font: system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  /* Grok-style centered reading column */
   --chat-column: 48rem;
-  /* ~768px; bump to 52rem if you want more code room */
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    --bg: #f4f4f6;
-    --fg: #1c1c1e;
-    --muted: rgba(0, 0, 0, 0.5);
-    --bubble-user: #e4e4ea;
-    --bubble-user-fg: #1c1c1e;
-    --bubble-assistant: rgba(0, 0, 0, 0.06);
-    --code-bg: #eef0f4;
-    --code-header: #e2e5eb;
+    --bg: #1e1e1e;
+    --fg: #f2f2f2;
+    --muted: rgba(255, 255, 255, 0.55);
+    --bubble-user: #2d2d2d;
+    --bubble-user-fg: #f2f2f2;
+    --bubble-assistant: rgba(255, 255, 255, 0.08);
+    --code-bg: #2a2a2a;
+    --code-header: #333333;
+    --accent: #62a0ea;
   }
 }
 
@@ -40,27 +39,29 @@ body {
   overflow: hidden;
 }
 
-/* Explicit bridge from StyleManager (wins over media query when set) */
+/* Desktop StyleManager bridge */
 body.theme-light {
-  --bg: #f4f4f6;
+  --bg: #ffffff;
   --fg: #1c1c1e;
-  --muted: rgba(0, 0, 0, 0.5);
-  --bubble-user: #e4e4ea;
+  --muted: rgba(0, 0, 0, 0.55);
+  --bubble-user: #e8e8ed;
   --bubble-user-fg: #1c1c1e;
   --bubble-assistant: rgba(0, 0, 0, 0.06);
-  --code-bg: #eef0f4;
-  --code-header: #e2e5eb;
+  --code-bg: #f0f0f4;
+  --code-header: #e4e4ea;
+  --accent: #3584e4;
 }
 
 body.theme-dark {
-  --bg: #121216;
-  --fg: #e8e8ed;
+  --bg: #1e1e1e;
+  --fg: #f2f2f2;
   --muted: rgba(255, 255, 255, 0.55);
-  --bubble-user: #22222c;
-  --bubble-user-fg: #dfdfdf;
+  --bubble-user: #2d2d2d;
+  --bubble-user-fg: #f2f2f2;
   --bubble-assistant: rgba(255, 255, 255, 0.08);
-  --code-bg: #1a1b22;
-  --code-header: #22232c;
+  --code-bg: #2a2a2a;
+  --code-header: #333333;
+  --accent: #62a0ea;
 }
 
 #root {

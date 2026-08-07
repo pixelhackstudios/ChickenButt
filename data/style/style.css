@@ -1,40 +1,18 @@
-/* ChickenButt Adw.Application style.css
- *
- * Libadwaita owns system chrome (headerbar, buttons, menus, light/dark).
- * We only: (1) gold accent, (2) layout geometry, (3) brand paints on OUR
- * custom classes under .chickenbutt-dark / .chickenbutt-light (set from
- * StyleManager.get_dark() in Python — never @media on custom providers).
+/* Layout-only application CSS. No color theme.
+ * Light/dark comes from the desktop via libadwaita StyleManager.
  */
 
-/* ---- Accent (real .suggested-action uses these) ---- */
-:root {
-  --accent-bg-color: #c9a227;
-  --accent-fg-color: #1a1a12;
-  --accent-color: #c9a227;
-}
-
-/* ============================================================
-   Geometry — always, no color dependency
-   ============================================================ */
-
-.chat-sidebar {
-  border-right: 1px solid rgba(128, 128, 128, 0.25);
-}
-
 .chat-sidebar-header {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
   padding: 6px 8px 6px 12px;
   min-height: 40px;
 }
 
 .chat-sidebar-footer {
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
   padding: 6px 8px;
   min-height: 40px;
 }
 
 .chat-sidebar-model-block {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
   padding-bottom: 4px;
 }
 
@@ -69,14 +47,6 @@
   margin: 1px 8px;
   padding: 0;
   min-height: 0;
-}
-
-.chat-sidebar row:hover {
-  background-color: rgba(128, 128, 128, 0.12);
-}
-
-.chat-sidebar row:selected {
-  background-color: rgba(201, 162, 39, 0.22);
 }
 
 .chat-sidebar-row-title {
@@ -123,10 +93,6 @@
   background: transparent;
 }
 
-.empty-state {
-  opacity: 0.95;
-}
-
 .empty-title {
   font-size: 1.15em;
   font-weight: 700;
@@ -162,6 +128,7 @@
 }
 
 .chat-user {
+  /* System accent from libadwaita / desktop */
   background-color: var(--accent-bg-color);
   color: var(--accent-fg-color);
   border-bottom-right-radius: 0;
@@ -211,15 +178,15 @@
 }
 
 .composer-shell {
-  background-color: rgba(128, 128, 128, 0.12);
+  background-color: alpha(currentColor, 0.08);
   border-radius: 22px;
-  border: 1px solid rgba(128, 128, 128, 0.2);
+  border: 1px solid alpha(currentColor, 0.12);
   padding: 4px 4px 4px 12px;
 }
 
 .composer-shell:focus-within {
-  border-color: rgba(201, 162, 39, 0.55);
-  background-color: rgba(128, 128, 128, 0.16);
+  border-color: alpha(var(--accent-bg-color), 0.55);
+  background-color: alpha(currentColor, 0.1);
 }
 
 .composer-input {
@@ -285,7 +252,7 @@
 }
 
 .load-overlay {
-  background-color: rgba(0, 0, 0, 0.62);
+  background-color: alpha(black, 0.5);
 }
 
 .load-card {
@@ -293,7 +260,7 @@
   border-radius: 18px;
   padding: 28px 32px;
   min-width: 280px;
-  border: 1px solid rgba(128, 128, 128, 0.25);
+  border: 1px solid alpha(currentColor, 0.12);
 }
 
 .load-title {
@@ -319,8 +286,8 @@
 }
 
 .health-banner {
-  background-color: rgba(201, 162, 39, 0.12);
-  border: 1px solid rgba(201, 162, 39, 0.28);
+  background-color: alpha(var(--accent-bg-color), 0.12);
+  border: 1px solid alpha(var(--accent-bg-color), 0.28);
   border-radius: 12px;
   padding: 10px 12px;
   margin-top: 4px;
@@ -328,13 +295,13 @@
 }
 
 .health-banner.error {
-  background-color: rgba(224, 27, 36, 0.12);
-  border-color: rgba(224, 27, 36, 0.35);
+  background-color: alpha(var(--error-bg-color), 0.12);
+  border-color: alpha(var(--error-color), 0.35);
 }
 
 .health-banner.warn {
-  background-color: rgba(229, 165, 10, 0.14);
-  border-color: rgba(229, 165, 10, 0.35);
+  background-color: alpha(var(--warning-bg-color), 0.14);
+  border-color: alpha(var(--warning-color), 0.35);
 }
 
 .health-banner-title {
@@ -346,32 +313,4 @@
   font-size: 0.85em;
   opacity: 0.85;
   margin-top: 2px;
-}
-
-/* ============================================================
-   Brand surfaces on OUR widgets only (not global :root tokens).
-   Python sets .chickenbutt-dark / .chickenbutt-light on the window
-   from StyleManager.get_dark() before present() and on notify::dark.
-   ============================================================ */
-
-.chickenbutt-dark .chat-surface,
-.chickenbutt-dark .chickenbutt-settings-panel {
-  background-color: #121216;
-  color: #e8e8ed;
-}
-
-.chickenbutt-dark .chat-sidebar {
-  background-color: #16161c;
-  color: #e8e8ed;
-}
-
-.chickenbutt-light .chat-surface,
-.chickenbutt-light .chickenbutt-settings-panel {
-  background-color: #f4f4f6;
-  color: #1c1c1e;
-}
-
-.chickenbutt-light .chat-sidebar {
-  background-color: #ececf0;
-  color: #1c1c1e;
 }
