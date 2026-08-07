@@ -15,19 +15,19 @@ if APP_DIR not in sys.path:
 def _prepare_flatpak_gtk_theme() -> None:
     """Avoid host GTK theme names that have no CSS inside org.gnome.Platform.
 
-    The settings portal often reports the host gtk-theme (e.g. Yaru-dark).
-    Flatpak does not ship arbitrary host themes under /usr/share/themes;
-    Yaru's gtk-4.0/gtk.css is a gresource import that fails in the sandbox
-    with: Failed to import resource:///com/ubuntu/themes/Yaru-dark/4.0/gtk.css
+    Ubuntu often exports GTK_THEME=Yaru-dark (or the portal reports Yaru).
+    Yaru's gtk-4.0/gtk.css is a gresource import that is **not** in the
+    GNOME Flatpak runtime, which prints:
 
-    When unset, prefer Adwaita (available in the GNOME runtime). libadwaita
-    still follows the desktop color-scheme for light/dark. An explicit
-    GTK_THEME from the user (or flatpak override) is left alone.
+        Failed to import resource:///com/ubuntu/themes/Yaru-dark/4.0/gtk.css
+
+    Force Adwaita under Flatpak (always overwrite host/portal Yaru names).
+    libadwaita still follows the desktop color-scheme for light/dark.
     """
     if not os.environ.get("FLATPAK_ID"):
         return
-    if os.environ.get("GTK_THEME"):
-        return
+    # Host env and portals routinely inject Yaru-*; do not "honor" that —
+    # those themes are not available in the sandbox.
     os.environ["GTK_THEME"] = "Adwaita"
 
 

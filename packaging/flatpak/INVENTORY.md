@@ -132,12 +132,11 @@ ChickenButt **follows the desktop color-scheme** (prefer-dark / prefer-light) vi
 libadwaita `StyleManager` and the WebKit transcript theme bridge. It does **not**
 grant host theme filesystem access and does not copy host `gtk-4.0/gtk.css`.
 
-Host theme names such as `Yaru-dark` often arrive through the settings portal, but
-their gresources are not in `org.gnome.Platform`. `main.py` therefore, when
-`FLATPAK_ID` is set and `GTK_THEME` is unset, selects **Adwaita** so GTK does not
-try to import missing Yaru resources. Light/dark still track the system preference.
-Users can override with e.g. `flatpak override --user --env=GTK_THEME=…` if a
-compatible Flatpak theme extension is installed.
+Host theme names such as `Yaru-dark` often arrive via the host environment and
+the settings portal; their gresources are not in `org.gnome.Platform`. The
+manifest sets `--env=GTK_THEME=Adwaita`, the `chickenbutt` launcher forces the
+same when `FLATPAK_ID` is set, and `main.py` forces Adwaita before Gtk loads
+(overwriting host Yaru). Light/dark still track the system color-scheme.
 
 ## Architecture
 
