@@ -163,44 +163,63 @@ body.theme-light {
   width: 100%;
 }
 
-/* Reasoning is a sibling of answer content (never merged into .md-body) */
-.reasoning {
-  margin: 0 0 10px 0;
-  padding: 4px 0 2px 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+/* Reasoning is a sibling of answer content (never merged into .md-body).
+   Use high specificity so .bubble.md pre code-block rules do not zero out
+   padding or paint a nested code chrome around the trace. */
+.bubble.md details.reasoning,
+details.reasoning {
+  margin: 0 0 12px 0;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted);
   font-size: 0.88em;
   line-height: 1.45;
+  overflow: hidden;
 }
 
-body.theme-light .reasoning {
-  border-color: rgba(0, 0, 0, 0.08);
+body.theme-light .bubble.md details.reasoning,
+body.theme-light details.reasoning {
+  border-color: rgba(0, 0, 0, 0.10);
   background: rgba(0, 0, 0, 0.03);
 }
 
-.reasoning-summary {
+.bubble.md details.reasoning > .reasoning-summary,
+details.reasoning > .reasoning-summary {
   cursor: pointer;
   user-select: none;
-  padding: 10px 16px 8px 16px;
+  padding: 12px 16px;
   font-weight: 600;
   list-style: none;
+  display: block;
 }
 
-.reasoning-summary::-webkit-details-marker {
+.bubble.md details.reasoning > .reasoning-summary::-webkit-details-marker,
+details.reasoning > .reasoning-summary::-webkit-details-marker {
   display: none;
 }
 
-.reasoning-body {
-  margin: 0;
-  padding: 4px 16px 14px 16px;
+/* Reset .bubble.md pre chrome; real padding lives here */
+.bubble.md details.reasoning > pre.reasoning-body,
+details.reasoning > pre.reasoning-body {
+  margin: 0 !important;
+  padding: 0 16px 16px 16px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: block !important;
+  flex-direction: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: anywhere;
   font-family: inherit;
   font-size: inherit;
   color: var(--muted);
+  line-height: 1.5;
 }
 
 .meta {
