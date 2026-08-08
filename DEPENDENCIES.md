@@ -32,6 +32,7 @@ runtime.
 | git | Cloning the repository |
 | meson >= 0.64.0 | Build system (`meson.build`); `>=0.64.0` for `install_data(..., preserve_path: true)` |
 | ninja | Meson's build backend |
+| glib-compile-resources | Compiles the app GResource (`data/chickenbutt.gresource.xml` → layout-only `style.css`) during `gnome.compile_resources()`; `meson setup` fails without it. Ubuntu ships it in `libglib2.0-dev` (the providing `*-dev-bin` package is renamed between releases, so depend on `libglib2.0-dev`); Fedora ships it in `glib2-devel`. |
 
 Optional validation tools (checked under `--build`, never fail a normal
 source build — CI should install them):
@@ -71,7 +72,7 @@ ollama list        # confirm at least one model is pulled
 
 ```bash
 python3 scripts/check_dependencies.py            # required runtime deps + optional/external status
-python3 scripts/check_dependencies.py --build     # also requires git/meson/ninja
+python3 scripts/check_dependencies.py --build     # also requires git/meson/ninja/glib-compile-resources
 ```
 
 Exits non-zero only when a **required** dependency is missing; optional
@@ -95,7 +96,7 @@ it is not part of the installed runtime and can be deleted once
 
 ```bash
 sudo dnf install \
-  git meson ninja-build \
+  git meson ninja-build glib2-devel \
   python3 python3-gobject python3-dasbus \
   gtk4 libadwaita webkitgtk6.0
 ```
@@ -112,7 +113,7 @@ sudo dnf install desktop-file-utils appstream   # validation tools, --build only
 ```bash
 sudo apt update
 sudo apt install \
-  git meson ninja-build \
+  git meson ninja-build libglib2.0-dev \
   python3 python3-gi python3-dasbus \
   gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-webkit-6.0
 ```

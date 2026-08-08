@@ -113,6 +113,14 @@ def check_ninja(r: Reporter) -> None:
     r.required("ninja", path is not None, path or "not found on PATH")
 
 
+def check_glib_compile_resources(r: Reporter) -> None:
+    # meson.build's gnome.compile_resources() bundles data/style/style.css
+    # into the app GResource. Without this binary `meson setup` fails
+    # outright, so it is a hard build requirement, not a validation extra.
+    path = shutil.which("glib-compile-resources")
+    r.required("glib-compile-resources", path is not None, path or "not found on PATH")
+
+
 def check_desktop_file_validate(r: Reporter) -> None:
     path = shutil.which("desktop-file-validate")
     r.optional(
@@ -180,6 +188,7 @@ def main() -> int:
         check_git(r)
         check_meson(r)
         check_ninja(r)
+        check_glib_compile_resources(r)
 
         print("\n=== Optional validation tools (--build) ===", flush=True)
         check_desktop_file_validate(r)
