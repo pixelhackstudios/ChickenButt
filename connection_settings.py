@@ -19,9 +19,8 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gio", "2.0")
-gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk
 
 import app_settings as _app_settings
 from model_fit import (
@@ -53,34 +52,6 @@ from model_profile import (
     num_ctx_for_tier,
 )
 from ollama_client import ModelDescriptor, OllamaClient, OllamaError
-
-_prefs_css_installed = False
-
-
-def _ensure_preferences_css() -> None:
-    """Spacing for the embedded settings panel (main-column content swap)."""
-    global _prefs_css_installed
-    if _prefs_css_installed:
-        return
-    provider = Gtk.CssProvider()
-    # Spacing only; colors live in GResource style.css
-    provider.load_from_string(
-        """
-        .chickenbutt-settings-panel headerbar {
-            padding-top: 10px;
-            padding-bottom: 8px;
-        }
-        .chickenbutt-settings-panel adw-view-switcher {
-            margin-top: 2px;
-        }
-        """
-    )
-    display = Gdk.Display.get_default()
-    if display is not None:
-        Gtk.StyleContext.add_provider_for_display(
-            display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
-    _prefs_css_installed = True
 
 
 def open_folder(path: Path, *, parent: Gtk.Window | None = None) -> None:
@@ -207,7 +178,6 @@ class ConnectionPreferences:
 
     def _build(self) -> Gtk.Widget:
         """Embedded full-column settings page (not a floating dialog)."""
-        _ensure_preferences_css()
         toolbar = Adw.ToolbarView()
         toolbar.add_css_class("chickenbutt-settings-panel")
         toolbar.set_hexpand(True)

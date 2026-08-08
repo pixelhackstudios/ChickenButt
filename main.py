@@ -28,7 +28,7 @@ _GRESOURCE_NAME = "chickenbutt-resources.gresource"
 
 
 def _register_app_resources() -> None:
-    """Load GResource so Adw.Application finds style.css (Yaru structural CSS)."""
+    """Load GResource so Adw.Application finds style.css (layout-only CSS)."""
     candidates = (
         os.path.join(APP_DIR, _GRESOURCE_NAME),
         os.path.join(APP_DIR, "data", _GRESOURCE_NAME),
@@ -67,13 +67,7 @@ def _register_app_resources() -> None:
 class ChickenButtApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
-        # Desktop light/dark via portal (DEFAULT == prefer-light unless dark).
-        try:
-            Adw.StyleManager.get_default().set_color_scheme(
-                Adw.ColorScheme.DEFAULT
-            )
-        except Exception:  # noqa: BLE001
-            pass
+        # Light/dark follows the desktop: libadwaita's default color scheme.
         self.window: ChatSidebar | None = None
         self.tray: TrayIcon | None = None
         self.connect("activate", self._on_activate)
@@ -125,49 +119,9 @@ class ChickenButtApp(Adw.Application):
             else:
                 print("Tray ready — click for Show / Hide / Exit.", flush=True)
             self.window.present()
-            # First paint can miss portal/CssProvider scheme until Appearance
-            # is toggled. Kick the same refresh that toggle triggers, then focus.
-            GLib.idle_add(self._kick_appearance)
-            GLib.timeout_add(50, self._kick_appearance)
-            GLib.timeout_add(200, self._kick_appearance)
             GLib.idle_add(self._focus_input)
         else:
             self._show_window()
-
-    def _kick_appearance(self) -> bool:
-        """Re-assert color scheme + layout so cold start matches post-toggle."""
-        try:
-            sm = Adw.StyleManager.get_default()
-            dark = bool(sm.get_dark())
-            # FORCE then DEFAULT re-runs Adw's stylesheet provider update
-            # (same effect as toggling GNOME Appearance once).
-            sm.set_color_scheme(
-                Adw.ColorScheme.FORCE_DARK if dark else Adw.ColorScheme.FORCE_LIGHT
-            )
-            sm.set_color_scheme(Adw.ColorScheme.DEFAULT)
-        except Exception:  # noqa: BLE001
-            pass
-        if self.window is not None:
-            try:
-                self.window.queue_resize()
-            except Exception:  # noqa: BLE001
-                pass
-            try:
-                # Keep WebKit in sync if transcript is already up.
-                t = getattr(self.window, "_transcript", None)
-                if t is not None and hasattr(t, "set_theme_dark"):
-                    t.set_theme_dark(bool(Adw.StyleManager.get_default().get_dark()))
-                elif t is not None and hasattr(t, "post"):
-                    dark = bool(Adw.StyleManager.get_default().get_dark())
-                    t.post(
-                        {
-                            "type": "theme_changed",
-                            "theme": "dark" if dark else "light",
-                        }
-                    )
-            except Exception:  # noqa: BLE001
-                pass
-        return False
 
     def _focus_input(self) -> bool:
         if self.window is not None:

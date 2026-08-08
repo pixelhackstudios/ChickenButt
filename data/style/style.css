@@ -1,74 +1,11 @@
 /*
- * ChickenButt GResource style.css (always loaded by Adw.Application).
+ * Layout-only application CSS. No color theme.
+ * Light/dark comes from the desktop via libadwaita StyleManager.
  *
- * Light structural Yaru greys live here. Dark overrides are in style-dark.css
- * (Adw enables that provider when StyleManager:dark is true — reliable on
- * first paint; media queries alone needed a GNOME appearance toggle to fix
- * layout). Layout rules below apply in both modes.
- *
- * Accent: system --accent-* (portal). Attribution: data/YARU_ATTRIBUTION.md
+ * Colors referenced below (--window-*, --sidebar-*, --accent-*, --error-*,
+ * --warning-*) are libadwaita's own named colors. They are never redefined
+ * here, so they resolve to whatever the runtime GTK4/Adwaita theme provides.
  */
-
-/* ---- Yaru structural LIGHT (base) ---- */
-:root {
-  --window-bg-color: #fafafa;
-  --window-fg-color: #3d3d3d;
-  --view-bg-color: #ffffff;
-  --view-fg-color: #3d3d3d;
-  --headerbar-bg-color: #fafafa;
-  --headerbar-fg-color: #3d3d3d;
-  --headerbar-backdrop-color: #fafafa;
-  --headerbar-border-color: #cccccc;
-  --sidebar-bg-color: #fafafa;
-  --sidebar-fg-color: #3d3d3d;
-  --sidebar-backdrop-color: #f0f0f0;
-  --sidebar-border-color: #cccccc;
-  --card-bg-color: #ffffff;
-  --card-fg-color: #3d3d3d;
-  --popover-bg-color: #ffffff;
-  --popover-fg-color: #3d3d3d;
-  --dialog-bg-color: #fafafa;
-  --dialog-fg-color: #3d3d3d;
-  --border-color: #cccccc;
-}
-
-/* Belt-and-suspenders: also flip via media query when CssProvider scheme is set */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --window-bg-color: #2c2c2c;
-    --window-fg-color: #f7f7f7;
-    --view-bg-color: #272727;
-    --view-fg-color: #f7f7f7;
-    --headerbar-bg-color: #2c2c2c;
-    --headerbar-fg-color: #f7f7f7;
-    --headerbar-backdrop-color: #2c2c2c;
-    --headerbar-border-color: #131313;
-    --sidebar-bg-color: #2a2a2a;
-    --sidebar-fg-color: #f7f7f7;
-    --sidebar-backdrop-color: #272727;
-    --sidebar-border-color: #131313;
-    --card-bg-color: #272727;
-    --card-fg-color: #f7f7f7;
-    --popover-bg-color: #2c2c2c;
-    --popover-fg-color: #f7f7f7;
-    --dialog-bg-color: #2c2c2c;
-    --dialog-fg-color: #f7f7f7;
-    --border-color: #131313;
-  }
-}
-
-/* ---- Shell chrome ---- */
-window {
-  background-color: var(--window-bg-color);
-  color: var(--window-fg-color);
-}
-
-headerbar {
-  background-color: var(--headerbar-bg-color);
-  color: var(--headerbar-fg-color);
-  border-bottom: 1px solid var(--headerbar-border-color);
-  box-shadow: none;
-}
 
 /* ---- chat surface ---- */
 .chat-surface {
@@ -391,15 +328,9 @@ headerbar {
 }
 
 /* ---- settings panel ---- */
-.chickenbutt-settings-panel {
-  background-color: var(--window-bg-color);
-  color: var(--window-fg-color);
-}
 .chickenbutt-settings-panel headerbar {
   padding-top: 10px;
   padding-bottom: 8px;
-  background-color: var(--headerbar-bg-color);
-  color: var(--headerbar-fg-color);
 }
 .chickenbutt-settings-panel adw-view-switcher {
   margin-top: 2px;

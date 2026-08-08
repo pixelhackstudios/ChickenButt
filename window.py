@@ -95,8 +95,8 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
         pass
 
 
-# Chrome/layout CSS: data/style/style.css via Adw.Application GResource
-# (Yaru structural light/dark + system accent). See data/YARU_ATTRIBUTION.md
+# Layout CSS: data/style/style.css via Adw.Application GResource.
+# No color theme — light/dark comes from the desktop via Adw.StyleManager.
 
 GREETING_TEXT = "What's up, ChickenButt?"
 GREETING_SUB = (

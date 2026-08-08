@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <!-- Adw.Application auto-loads style.css always; style-dark.css when dark. -->
+  <!-- Adw.Application auto-loads style.css: layout only, no color theme. -->
   <gresource prefix="/io/github/pixelhackstudios/ChickenButt">
     <file alias="style.css">style/style.css</file>
-    <file alias="style-dark.css">style/style-dark.css</file>
   </gresource>
 </gresources>

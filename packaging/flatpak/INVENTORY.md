@@ -1,9 +1,8 @@
 # Flatpak appearance
 
 - Session bus → Settings portal (color-scheme + accent).
-- `Adw.StyleManager` `DEFAULT` follows prefer-dark / prefer-light.
-- Bundled GResource `style.css`: Yaru structural greys + system accent vars.
-- No `GTK_THEME`, no host theme mounts.
+- `Adw.StyleManager` default follows prefer-dark / prefer-light.
+- Bundled GResource `style.css`: layout only, no color theme.
+- No `GTK_THEME`, no host theme mounts, no bundled theme.
 
-Ubuntu tip: use GTK theme **Yaru** (or Yaru-yellow, …) with **Appearance**
-Light/Dark — not the legacy **Yaru-dark** application theme name.
+Colors and light/dark come entirely from the GTK4/libadwaita runtime.

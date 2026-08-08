@@ -166,8 +166,8 @@ install_data(
   rename: '@0@.svg'.format(app_id),
 )
 
-# Application GResource: Adw.Application auto-loads style.css / style-dark.css
-# (and HC variants) from the app resource base path. Bundle lives next to the
+# Application GResource: Adw.Application auto-loads style.css from the app
+# resource base path. Layout only — no color theme. Bundle lives next to the
 # Python modules so main.py can Gio.Resource.load() it at startup.
 gnome = import('gnome')
 gnome.compile_resources(
