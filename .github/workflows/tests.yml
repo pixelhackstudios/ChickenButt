@@ -38,6 +38,7 @@ jobs:
             gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-webkit-6.0 \
             gir1.2-gdkpixbuf-2.0 \
             desktop-file-utils appstream \
+            libglib2.0-dev \
             xvfb dbus dbus-x11
 
       - name: Allow unprivileged user namespaces (bubblewrap needs this; Ubuntu 24.04+ restricts it via AppArmor by default)
