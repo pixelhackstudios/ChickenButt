@@ -54,6 +54,19 @@ from model_profile import (
 from ollama_client import ModelDescriptor, OllamaClient, OllamaError
 
 
+def _markup_safe(text: str) -> str:
+    """Escape dynamic text destined for an Adw row title/subtitle.
+
+    ``Adw.PreferencesRow:use-markup`` defaults to TRUE, so these strings are
+    parsed as Pango markup. Values derived from the server, the model, or the
+    filesystem are plain text, not markup — an unescaped ``<`` aborts
+    rendering (e.g. the context-usage label ``... tokens (<1%)`` failed with
+    "“1%)<” is not a valid name"). Escape at this boundary rather than
+    special-casing any single value.
+    """
+    return GLib.markup_escape_text(str(text))
+
+
 def open_folder(path: Path, *, parent: Gtk.Window | None = None) -> None:
     """Reveal *path* in the file manager; create the directory if needed."""
     try:
@@ -295,7 +308,7 @@ class ConnectionPreferences:
 
         config_row = Adw.ActionRow()
         config_row.set_title("Config folder")
-        config_row.set_subtitle(str(config_dir))
+        config_row.set_subtitle(_markup_safe(config_dir))
         config_btn = Gtk.Button(label="Open")
         config_btn.set_valign(Gtk.Align.CENTER)
         config_btn.connect(
@@ -307,7 +320,7 @@ class ConnectionPreferences:
 
         data_row = Adw.ActionRow()
         data_row.set_title("Data folder")
-        data_row.set_subtitle(str(data_dir))
+        data_row.set_subtitle(_markup_safe(data_dir))
         data_btn = Gtk.Button(label="Open")
         data_btn.set_valign(Gtk.Align.CENTER)
         data_btn.connect(
@@ -508,9 +521,9 @@ class ConnectionPreferences:
 
     def _set_status(self, status: str, version: str | None = None) -> None:
         if self._status_row is not None:
-            self._status_row.set_subtitle(status)
+            self._status_row.set_subtitle(_markup_safe(status))
         if version is not None and self._version_row is not None:
-            self._version_row.set_subtitle(version)
+            self._version_row.set_subtitle(_markup_safe(version))
 
     def _on_url_apply(self, *_args) -> None:
         if self._applying:
@@ -558,7 +571,9 @@ class ConnectionPreferences:
         self._model_loading = True
         try:
             if self._model_title_row is not None:
-                self._model_title_row.set_subtitle(model or "No model selected")
+                self._model_title_row.set_subtitle(
+                    _markup_safe(model or "No model selected")
+                )
 
             enabled = bool(model)
             for w in (
@@ -692,7 +707,7 @@ class ConnectionPreferences:
     def _fit_set(self, key: str, subtitle: str) -> None:
         row = self._fit_rows.get(key)
         if row is not None:
-            row.set_subtitle(subtitle)
+            row.set_subtitle(_markup_safe(subtitle))
 
     def _fit_clear_all(self) -> None:
         for key in self._fit_rows:
