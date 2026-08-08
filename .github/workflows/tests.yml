@@ -27,7 +27,7 @@ jobs:
       NO_AT_BRIDGE: "1"
       LIBGL_ALWAYS_SOFTWARE: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install system dependencies
         run: |
