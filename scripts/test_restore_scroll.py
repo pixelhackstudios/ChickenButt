@@ -66,12 +66,18 @@ def wait_until(cond, timeout: float = 20.0) -> bool:
 
 
 SPY_JS = (
+    # Re-evaluated between phases to reset the counter, so the accessor
+    # install must be idempotent. Re-defining it would otherwise leave a
+    # descriptor whose get/set both throw, and any read-modify-write of
+    # scrollTop would then fail before the counter could increment.
     "window.__testScrollCount = 0;"
     "(function(){"
+    "  if (window.__scrollSpyInstalled) return;"
+    "  window.__scrollSpyInstalled = true;"
     "  const root = document.getElementById('root');"
-    "  const proto = Object.getPrototypeOf(root);"
-    "  const desc = Object.getOwnPropertyDescriptor(proto, 'scrollTop');"
+    "  const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');"
     "  Object.defineProperty(root, 'scrollTop', {"
+    "    configurable: true,"
     "    set(v) { window.__testScrollCount++; desc.set.call(this, v); },"
     "    get() { return desc.get.call(this); }"
     "  });"

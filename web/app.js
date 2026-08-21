@@ -242,13 +242,99 @@
     }
   }
 
+  // Turn anchoring (ChatGPT / Claude / Grok convention): sending a prompt
+  // lifts that user message to the top of the viewport and the reply fills
+  // downward from there, instead of the transcript hugging the bottom. A
+  // blank tail spacer reserves the room that makes the lift possible when
+  // the turn is shorter than the viewport.
+  let turnAnchor = null;
+  let tailSpace = null;
+  const TURN_TOP_PAD = 8;
+  const TAIL_PAD = 24;
+
+  function lastRow() {
+    for (let el = messagesEl.lastElementChild; el; el = el.previousElementSibling) {
+      if (el.classList && el.classList.contains("row")) return el;
+    }
+    return null;
+  }
+
+  function ensureTailSpace() {
+    if (!tailSpace) {
+      tailSpace = document.createElement("div");
+      tailSpace.className = "tailspace";
+      tailSpace.setAttribute("aria-hidden", "true");
+    }
+    // Always keep it as the final child, even after new rows append.
+    if (tailSpace.parentNode !== messagesEl || tailSpace.nextSibling) {
+      messagesEl.appendChild(tailSpace);
+    }
+    return tailSpace;
+  }
+
+  function clearTailSpace() {
+    turnAnchor = null;
+    if (tailSpace) tailSpace.style.height = "0px";
+  }
+
+  // Reserve exactly enough blank space that the anchored turn can fill one
+  // viewport. Shrinks back to nothing as the reply grows past that.
+  function sizeTailSpace() {
+    const root = document.getElementById("root");
+    if (!turnAnchor || !turnAnchor.isConnected) {
+      if (tailSpace) tailSpace.style.height = "0px";
+      return;
+    }
+    const sp = ensureTailSpace();
+    const last = lastRow();
+    if (!last) return;
+    // Rows sit above the spacer, so their geometry does not depend on it.
+    // Never collapse it to measure: shrinking the document even for one
+    // frame makes the browser clamp scrollTop, and restoring the height
+    // does not restore the lost scroll position.
+    const used =
+      last.getBoundingClientRect().bottom - turnAnchor.getBoundingClientRect().top;
+    const need = root.clientHeight - TURN_TOP_PAD - used;
+    sp.style.height = Math.max(0, Math.round(need)) + "px";
+  }
+
+  function anchorTurn(row) {
+    turnAnchor = row;
+    stickToBottom = true;
+    sizeTailSpace();
+    const root = document.getElementById("root");
+    root.scrollTop +=
+      turnAnchor.getBoundingClientRect().top -
+      root.getBoundingClientRect().top -
+      TURN_TOP_PAD;
+  }
+
   function nearBottom(el, px) {
-    return el.scrollHeight - el.scrollTop - el.clientHeight < (px || 80);
+    const last = lastRow();
+    if (!last) return el.scrollHeight - el.scrollTop - el.clientHeight < (px || 80);
+    // Measure against real content, not the blank tail spacer.
+    return (
+      last.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom <
+      (px || 80)
+    );
   }
 
   function scrollIfPinned() {
     if (!stickToBottom) return;
     const root = document.getElementById("root");
+    if (turnAnchor && turnAnchor.isConnected) {
+      sizeTailSpace();
+      const last = lastRow();
+      if (!last) return;
+      // Only chase the reply once it actually reaches the bottom edge;
+      // until then it fills the reserved space downward.
+      const over =
+        last.getBoundingClientRect().bottom -
+        root.getBoundingClientRect().bottom +
+        TAIL_PAD;
+      if (over > 0) root.scrollTop += over;
+      return;
+    }
     root.scrollTop = root.scrollHeight;
   }
 
@@ -270,6 +356,7 @@
     emptyEl.hidden = false;
     messagesEl.hidden = true;
     messagesEl.innerHTML = "";
+    clearTailSpace();
     nodes.clear();
   }
 
@@ -1485,6 +1572,8 @@
 
     row.appendChild(col);
     messagesEl.appendChild(row);
+    // New rows must land above the reserved blank space, not below it.
+    if (tailSpace && tailSpace.parentNode === messagesEl) ensureTailSpace();
 
     const n = {
       id,
@@ -1519,6 +1608,10 @@
       if (!opts.deferWire) wireCodeUi(body);
       highlightAllIn(body);
       setActionsVisible(id, true);
+    }
+    if (role === "user" && !opts.deferScroll) {
+      // A restored history batch must not re-anchor; only a live send does.
+      anchorTurn(row);
     }
     if (!opts.deferScroll) scrollIfPinned();
   }
@@ -1643,6 +1736,7 @@
             event.empty_sub || ""
           );
         }
+        clearTailSpace();
         stickToBottom = true;
         scrollIfPinned();
         break;

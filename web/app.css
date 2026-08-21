@@ -131,6 +131,18 @@ body.theme-dark {
   box-sizing: border-box;
 }
 
+/* Reserved blank space under an anchored turn. Sized from JS; never
+   focusable, never selectable, and invisible to assistive tech. */
+.tailspace {
+  flex: 0 0 auto;
+  height: 0;
+  /* cancel the .messages flex gap so an empty spacer adds no scroll range */
+  margin-top: -12px;
+  width: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
 .row {
   display: flex;
   gap: 0;
