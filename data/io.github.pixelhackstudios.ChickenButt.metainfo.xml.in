@@ -50,7 +50,7 @@
   <releases>
     <release version="@VERSION@" date="2026-08-20">
       <description>
-        <p>Version 1.0.0: Live streaming transcript — Markdown, lists, and code cards render while tokens arrive; syntax highlighting stays current during an open fence; new text fades in. Native GTK transcript and restored history are unchanged.</p>
+        <p>Version 1.0.0: Live streaming transcript — Markdown, lists, and code cards render while tokens arrive; syntax highlighting stays current during an open fence; new text fades in. The transcript now scrolls natively instead of with WebKit's eased scrolling. Native GTK transcript and restored history are unchanged.</p>
       </description>
     </release>
     <release version="0.1.3" date="2026-08-07">

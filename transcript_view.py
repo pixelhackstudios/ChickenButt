@@ -103,6 +103,9 @@ class WebTranscriptView(Gtk.Box):
         settings = self._view.get_settings()
         settings.set_enable_developer_extras(True)
         settings.set_javascript_can_access_clipboard(True)
+        # WebKitGTK defaults this to TRUE, which eases every wheel scroll.
+        # The transcript should scroll like the rest of the desktop.
+        settings.set_enable_smooth_scrolling(False)
 
         ucm = self._view.get_user_content_manager()
         ucm.register_script_message_handler("chickenbutt")
