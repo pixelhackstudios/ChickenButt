@@ -50,6 +50,11 @@
   <releases>
     <release version="@VERSION@" date="2026-08-20">
       <description>
+        <p>Version 1.1.0: Sending a prompt now lifts that message to the top of the transcript and the reply fills downward from there, keeping the current exchange in view instead of the transcript hugging the bottom. Reopening a conversation still lands at the most recent message.</p>
+      </description>
+    </release>
+    <release version="1.0.0" date="2026-08-20">
+      <description>
         <p>Version 1.0.0: Live streaming transcript — Markdown, lists, and code cards render while tokens arrive; syntax highlighting stays current during an open fence; new text fades in. Native GTK transcript and restored history are unchanged.</p>
       </description>
     </release>

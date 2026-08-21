@@ -11,4 +11,4 @@ from __future__ import annotations
 
 APP_ID = "io.github.pixelhackstudios.ChickenButt"
 APP_NAME = "ChickenButt"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
