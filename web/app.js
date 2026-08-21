@@ -2,8 +2,12 @@
  * ChickenButt transcript page — presentation only.
  *
  * Streaming (assistant): open a real code card as soon as ``` arrives, then
- * fill it token-by-token (Grok-style). Prose stays plain/fast until fence or done.
- * Final message_done: full Markdown polish via marked.
+ * fill it token-by-token (Grok-style). Live prose is healed (remend-style
+ * unterminated markers) and rendered through marked+DOMPurify per block.
+ * Completed blocks stay in the tree; message_done does not replace the bubble.
+ * Incoming deltas are paced with an rAF display buffer so Ollama bursts do
+ * not splat; the host finishing still drains the remainder quickly.
+ * New prose and fenced-code tails fade in.
  */
 (function () {
   "use strict";
@@ -13,6 +17,15 @@
   const nodes = new Map();
 
   let stickToBottom = true;
+
+  // Display buffer: network/host chunks vs what streamUpdate paints.
+  // ~70 cps so the 240ms tail fade is actually visible. Backlog still
+  // raises the rate so a fast local model never sits minutes behind.
+  // After message_done, drain in FINISH_MS.
+  const SMOOTH_CHAR_MS = 14;
+  const SMOOTH_BACKLOG_GAIN = 64;
+  const SMOOTH_FINISH_MS = 200;
+  const STREAM_FADE_MS = 240;
 
   function postIntent(payload) {
     try {
@@ -127,13 +140,19 @@
     );
   }
 
-  function highlightCodeEl(codeEl, lang) {
+  function highlightCodeEl(codeEl, lang, plainSrc) {
     if (!codeEl || typeof hljs === "undefined") return;
+    const plain =
+      plainSrc != null ? String(plainSrc) : codeEl.textContent || "";
+    if (
+      codeEl.dataset.hljs === "1" &&
+      codeEl.dataset.hljsPlain === String(plain.length)
+    ) {
+      return;
+    }
     try {
-      // Reset previous highlight markup
-      const plain = codeEl.textContent;
       codeEl.textContent = plain;
-      codeEl.className = "language-" + (lang || "code");
+      codeEl.classList.add("language-" + (lang || "code"));
       if (lang && hljs.getLanguage(lang)) {
         const result = hljs.highlight(plain, { language: lang, ignoreIllegals: true });
         codeEl.innerHTML = result.value;
@@ -141,9 +160,13 @@
       } else {
         hljs.highlightElement(codeEl);
       }
+      codeEl.dataset.hljs = "1";
+      codeEl.dataset.hljsPlain = String(plain.length);
     } catch (_) {
       try {
         hljs.highlightElement(codeEl);
+        codeEl.dataset.hljs = "1";
+        codeEl.dataset.hljsPlain = String(plain.length);
       } catch (_) { /* ignore */ }
     }
   }
@@ -243,6 +266,7 @@
   }
 
   function showEmpty() {
+    nodes.forEach((n) => cancelSmooth(n));
     emptyEl.hidden = false;
     messagesEl.hidden = true;
     messagesEl.innerHTML = "";
@@ -660,6 +684,140 @@
     });
   }
 
+  /* ---------- incomplete Markdown (remend-style, prose segments only) ---------- */
+
+  /**
+   * Close unterminated inline markers so marked can render a live prose
+   * segment. Fenced code is owned by the code-shell path and is not closed
+   * here. Incomplete links/images are reduced to visible text rather than a
+   * dummy href.
+   */
+  function healIncompleteMarkdown(text) {
+    if (!text) return text;
+    let s = String(text);
+
+    s = s.replace(/!\[[^\]]*\]\([^)\n]*$/, "");
+    s = s.replace(/!\[[^\]]*$/, "");
+    s = s.replace(/\[([^\]]+)\]\([^)\n]*$/, "$1");
+    s = s.replace(/\[([^\]]+)$/, "$1");
+
+    if (unbalancedBackticks(s)) s += "`";
+    if (countDelim(s, "~~") % 2 === 1) s += "~~";
+    if (countDelim(s, "**") % 2 === 1) s += "**";
+    if (countDelim(s, "__") % 2 === 1) s += "__";
+    if (
+      countSingleMarker(s, "*") % 2 === 1 &&
+      !singleMarkerIsListBullet(s, "*")
+    ) {
+      s += "*";
+    }
+    if (countSingleMarker(s, "_") % 2 === 1 && lastUnderscoreIsEmphasis(s)) {
+      s += "_";
+    }
+    return s;
+  }
+
+  function scanNonCode(s, onChar) {
+    let i = 0;
+    let inInline = false;
+    while (i < s.length) {
+      if (s[i] === "\\" && i + 1 < s.length) {
+        i += 2;
+        continue;
+      }
+      if (s.startsWith("```", i)) {
+        const end = s.indexOf("```", i + 3);
+        if (end === -1) break;
+        i = end + 3;
+        continue;
+      }
+      if (s[i] === "`") {
+        inInline = !inInline;
+        i += 1;
+        continue;
+      }
+      if (!inInline) {
+        const step = onChar(i);
+        i += step != null && step > 0 ? step : 1;
+      } else {
+        i += 1;
+      }
+    }
+  }
+
+  function unbalancedBackticks(s) {
+    let n = 0;
+    let i = 0;
+    while (i < s.length) {
+      if (s[i] === "\\" && i + 1 < s.length) {
+        i += 2;
+        continue;
+      }
+      if (s.startsWith("```", i)) {
+        i += 3;
+        continue;
+      }
+      if (s[i] === "`") n += 1;
+      i += 1;
+    }
+    return n % 2 === 1;
+  }
+
+  function countDelim(s, delim) {
+    let n = 0;
+    const dlen = delim.length;
+    scanNonCode(s, (i) => {
+      if (s.startsWith(delim, i)) {
+        n += 1;
+        return dlen;
+      }
+      return 1;
+    });
+    return n;
+  }
+
+  function countSingleMarker(s, ch) {
+    let n = 0;
+    const dbl = ch + ch;
+    scanNonCode(s, (i) => {
+      if (s.startsWith(dbl, i)) return 2;
+      if (s[i] === ch) n += 1;
+      return 1;
+    });
+    return n;
+  }
+
+  function lastSingleMarkerIndex(s, ch) {
+    let last = -1;
+    const dbl = ch + ch;
+    scanNonCode(s, (i) => {
+      if (s.startsWith(dbl, i)) return 2;
+      if (s[i] === ch) last = i;
+      return 1;
+    });
+    return last;
+  }
+
+  function singleMarkerIsListBullet(s, ch) {
+    const idx = lastSingleMarkerIndex(s, ch);
+    if (idx < 0) return false;
+    const lineStart = s.lastIndexOf("\n", idx - 1) + 1;
+    const prefix = s.slice(lineStart, idx);
+    if (/[^ \t]/.test(prefix)) return false;
+    const after = idx + 1 < s.length ? s[idx + 1] : "";
+    return after === "" || after === " " || after === "\t";
+  }
+
+  function lastUnderscoreIsEmphasis(s) {
+    const idx = lastSingleMarkerIndex(s, "_");
+    if (idx < 0) return false;
+    const before = idx > 0 ? s[idx - 1] : "\n";
+    // snake_case / identifiers: marked does not treat these as italic.
+    if (/[A-Za-z0-9_]/.test(before)) return false;
+    const after = s.slice(idx + 1);
+    return after.search(/\S/) !== -1;
+  }
+
   /* ---------- structural stream builder (Grok-style code shells) ---------- */
 
   function createCodeShell(lang) {
@@ -703,7 +861,15 @@
     pre.appendChild(head);
     pre.appendChild(code);
     wireCodeCopy(pre);
-    return { pre, code, langSpan };
+    return {
+      pre,
+      code,
+      langSpan,
+      plain: "",
+      committedLen: 0,
+      fades: [],
+      prefix: null,
+    };
   }
 
   function ensureStream(n) {
@@ -713,6 +879,7 @@
       mode: "prose", // prose | code
       carry: "",
       proseEl: null,
+      proseRaw: "",
       code: null, // { pre, code, langSpan }
     };
     return n.stream;
@@ -725,6 +892,8 @@
     el.className = "stream-prose";
     n.body.appendChild(el);
     s.proseEl = el;
+    s.proseRaw = "";
+    s.proseVisibleLen = 0;
     return el;
   }
 
@@ -742,50 +911,226 @@
 
   function closeCode(n) {
     const s = ensureStream(n);
+    if (s.hlRaf) {
+      cancelAnimationFrame(s.hlRaf);
+      s.hlRaf = 0;
+    }
     if (s.code && s.code.pre) {
       s.code.pre.classList.remove("streaming-code");
-      // IDE-style colors once the fence closes
-      const lang = s.code.pre.dataset.lang || "";
-      highlightCodeEl(s.code.code, lang);
+      paintLiveCode(s, true);
     }
     s.code = null;
     s.mode = "prose";
     n.bubble.classList.remove("in-code");
   }
 
+  function collectProseTextNodes(root, out) {
+    const kids = root.childNodes;
+    const skipWs =
+      root.classList && root.classList.contains("stream-prose");
+    for (let i = 0; i < kids.length; i += 1) {
+      const node = kids[i];
+      if (node.nodeType === 3) {
+        if (skipWs && !String(node.nodeValue || "").trim()) continue;
+        if (node.nodeValue) out.push(node);
+      } else if (node.nodeType === 1 && node.tagName !== "PRE") {
+        collectProseTextNodes(node, out);
+      }
+    }
+  }
+
+  function proseVisibleLength(el) {
+    const nodes = [];
+    collectProseTextNodes(el, nodes);
+    let n = 0;
+    for (let i = 0; i < nodes.length; i += 1) {
+      n += (nodes[i].nodeValue || "").length;
+    }
+    return n;
+  }
+
+  function appendFadeChunk(parent, extra) {
+    const parts = String(extra).split(/(\s+)/);
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = parts[i];
+      if (!part) continue;
+      if (/^\s+$/.test(part)) {
+        parent.appendChild(document.createTextNode(part));
+        continue;
+      }
+      const span = document.createElement("span");
+      span.className = "stream-fade";
+      span.textContent = part;
+      parent.appendChild(span);
+    }
+  }
+
+  function tryPatchProseTail(el, html) {
+    if (!el || !el.lastElementChild) return false;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    if (tmp.childElementCount !== el.childElementCount) return false;
+    const oldLast = el.lastElementChild;
+    const newLast = tmp.lastElementChild;
+    if (!oldLast || !newLast) return false;
+    if (oldLast.tagName !== newLast.tagName) return false;
+    if (oldLast.tagName === "PRE") return false;
+    const oldText = oldLast.textContent || "";
+    const newText = newLast.textContent || "";
+    if (newText === oldText) return true;
+    if (!newText.startsWith(oldText)) return false;
+    const extra = newText.slice(oldText.length);
+    if (extra) appendFadeChunk(oldLast, extra);
+    return true;
+  }
+
+  function wrapNewProseTail(el, skipChars) {
+    if (!el || skipChars < 0) return;
+    const nodes = [];
+    collectProseTextNodes(el, nodes);
+    let seen = 0;
+    for (let i = 0; i < nodes.length; i += 1) {
+      const node = nodes[i];
+      const t = node.nodeValue || "";
+      const nextSeen = seen + t.length;
+      if (nextSeen <= skipChars) {
+        seen = nextSeen;
+        continue;
+      }
+      const cut = Math.max(0, skipChars - seen);
+      const fresh = t.slice(cut);
+      seen = nextSeen;
+      if (!fresh || !/\S/.test(fresh)) continue;
+      const parent = node.parentNode;
+      if (!parent) continue;
+      const span = document.createElement("span");
+      span.className = "stream-fade";
+      span.textContent = fresh;
+      if (cut > 0) {
+        node.nodeValue = t.slice(0, cut);
+        parent.insertBefore(span, node.nextSibling);
+      } else {
+        parent.replaceChild(span, node);
+      }
+    }
+  }
+
   function appendProseText(n, text) {
     if (!text) return;
+    const s = ensureStream(n);
     const el = ensureProseEl(n);
-    el.textContent += text;
+    s.proseRaw = (s.proseRaw || "") + text;
+    const html = renderMarkdown(healIncompleteMarkdown(s.proseRaw));
+    const skip = s.proseVisibleLen || 0;
+    let patched = false;
+    try {
+      patched = tryPatchProseTail(el, html);
+    } catch (_) {
+      patched = false;
+    }
+    if (!patched) {
+      el.innerHTML = html;
+      try {
+        const vis = proseVisibleLength(el);
+        if (vis > skip) wrapNewProseTail(el, skip);
+        else if (vis < skip) wrapNewProseTail(el, 0);
+      } catch (_) { /* fade is cosmetic */ }
+    }
+    s.proseVisibleLen = proseVisibleLength(el);
+  }
+
+  function flushCarryFinished(n) {
+    const s = n.stream;
+    if (!s) return;
+    if (s.carry) {
+      if (s.mode === "code") {
+        if (s.carry.trim().startsWith("```")) {
+          s.carry = "";
+          closeCode(n);
+        } else {
+          appendCodeText(n, s.carry);
+          s.carry = "";
+          closeCode(n);
+        }
+      } else if (s.carry.trim().startsWith("```")) {
+        const lang = s.carry.trim().slice(3).trim().split(/\s+/)[0] || "code";
+        s.carry = "";
+        openCode(n, lang);
+        closeCode(n);
+      } else {
+        appendProseText(n, s.carry);
+        s.carry = "";
+      }
+    } else if (s.mode === "code") {
+      closeCode(n);
+    }
   }
 
   function appendCodeText(n, text) {
     if (!text) return;
     const s = ensureStream(n);
     if (!s.code) openCode(n, "code");
-    // Keep plain text while streaming; schedule a soft highlight refresh
-    if (s.code.code.dataset.hljs === "1") {
-      // strip prior highlight back to plain before append
-      const plain = s.code.code.textContent;
-      s.code.code.textContent = plain;
-      s.code.code.dataset.hljs = "0";
-    }
-    s.code.code.textContent += text;
+    s.code.plain = (s.code.plain || "") + text;
+    const span = document.createElement("span");
+    span.className = "stream-fade";
+    span.textContent = text;
+    s.code.code.appendChild(span);
+    if (!s.code.fades) s.code.fades = [];
+    s.code.fades.push({
+      el: span,
+      at: performance.now ? performance.now() : Date.now(),
+      len: text.length,
+    });
     s.code.pre.scrollTop = s.code.pre.scrollHeight;
     scheduleLiveHighlight(n);
+  }
+
+  function ensureCodePrefix(shell) {
+    if (shell.prefix && shell.prefix.isConnected) return shell.prefix;
+    const prefix = document.createElement("span");
+    prefix.className = "cb-code-prefix";
+    shell.code.insertBefore(prefix, shell.code.firstChild);
+    shell.prefix = prefix;
+    return prefix;
+  }
+
+  function paintLiveCode(s, flatten) {
+    if (!s || !s.code || !s.code.code) return;
+    const shell = s.code;
+    const lang = shell.pre.dataset.lang || "";
+    const plain = shell.plain || "";
+    if (flatten) {
+      shell.fades = [];
+      shell.committedLen = plain.length;
+      shell.prefix = null;
+      highlightCodeEl(shell.code, lang, plain);
+      return;
+    }
+    const now = performance.now ? performance.now() : Date.now();
+    const fades = shell.fades || [];
+    while (fades.length && now - fades[0].at >= STREAM_FADE_MS) {
+      const done = fades.shift();
+      shell.committedLen = (shell.committedLen || 0) + done.len;
+      if (done.el && done.el.parentNode) done.el.parentNode.removeChild(done.el);
+    }
+    const committed = Math.min(shell.committedLen || 0, plain.length);
+    shell.committedLen = committed;
+    if (committed > 0) {
+      const prefix = ensureCodePrefix(shell);
+      highlightCodeEl(prefix, lang, plain.slice(0, committed));
+      shell.code.classList.add("hljs");
+      shell.code.dataset.hljs = "1";
+    }
   }
 
   function scheduleLiveHighlight(n) {
     const s = n.stream;
     if (!s || !s.code) return;
-    if (s.hlTimer) clearTimeout(s.hlTimer);
-    s.hlTimer = setTimeout(() => {
-      s.hlTimer = null;
-      if (!s.code || !s.code.code) return;
-      const lang = s.code.pre.dataset.lang || "";
-      highlightCodeEl(s.code.code, lang);
-      s.code.code.dataset.hljs = "1";
-    }, 120);
+    if (s.hlRaf) return;
+    s.hlRaf = requestAnimationFrame(() => {
+      s.hlRaf = 0;
+      paintLiveCode(s);
+    });
   }
 
   function handleCompleteLine(n, line) {
@@ -857,42 +1202,170 @@
     }
   }
 
-  function finalizeStream(n, fullText, thinkingText) {
-    if (fullText != null) n.raw = fullText;
-    if (thinkingText != null) n.reasoning = thinkingText;
-    // Flush carry
-    const s = n.stream;
-    if (s && s.carry) {
-      if (s.mode === "code") {
-        if (s.carry.trim().startsWith("```")) {
-          s.carry = "";
-          closeCode(n);
-        } else {
-          appendCodeText(n, s.carry);
-          s.carry = "";
-          closeCode(n);
-        }
-      } else if (s.carry.trim().startsWith("```")) {
-        const lang = s.carry.trim().slice(3).trim().split(/\s+/)[0] || "code";
-        s.carry = "";
-        openCode(n, lang);
-        closeCode(n);
-      } else {
-        appendProseText(n, s.carry);
-        s.carry = "";
-      }
-    } else if (s && s.mode === "code") {
-      closeCode(n);
+  function utf16Take(s, charCount) {
+    let i = 0;
+    let n = 0;
+    while (i < s.length && n < charCount) {
+      const c = s.charCodeAt(i);
+      i += c >= 0xd800 && c <= 0xdbff && i + 1 < s.length ? 2 : 1;
+      n += 1;
     }
+    return i;
+  }
 
-    // Full Markdown polish (bold, lists, proper structure) + syntax colors
+  function ensureSmooth(n) {
+    if (n.smooth) return n.smooth;
+    n.smooth = {
+      pending: "",
+      displayed: n.raw || "",
+      raf: 0,
+      lastTs: 0,
+      finishing: false,
+      finishText: null,
+      finishThinking: undefined,
+    };
+    return n.smooth;
+  }
+
+  function cancelSmooth(n) {
+    if (!n || !n.smooth) return;
+    if (n.smooth.raf) {
+      cancelAnimationFrame(n.smooth.raf);
+      n.smooth.raf = 0;
+    }
+    n.smooth = null;
+  }
+
+  function kickSmooth(n) {
+    const s = n.smooth;
+    if (!s || s.raf) return;
+    const tick = (ts) => {
+      if (!n.smooth) return;
+      n.smooth.raf = 0;
+      pumpSmooth(n, ts);
+      if (n.smooth && (n.smooth.pending || n.smooth.finishing)) {
+        n.smooth.raf = requestAnimationFrame(tick);
+      }
+    };
+    s.raf = requestAnimationFrame(tick);
+  }
+
+  function pumpSmooth(n, ts) {
+    const s = n.smooth;
+    if (!s) return;
+    if (!s.pending) {
+      if (s.finishing) completeSmooth(n);
+      return;
+    }
+    let dt;
+    if (!s.lastTs) {
+      // First tick: pretend one frame so we do not stall at 1 code unit.
+      dt = 16;
+      s.lastTs = ts;
+    } else {
+      dt = Math.min(50, Math.max(0, ts - s.lastTs));
+      s.lastTs = ts;
+    }
+    let takeChars = Math.max(
+      1,
+      Math.round((dt / SMOOTH_CHAR_MS) * (1 + s.pending.length / SMOOTH_BACKLOG_GAIN))
+    );
+    if (s.finishing) {
+      takeChars = Math.max(
+        takeChars,
+        Math.ceil((s.pending.length * dt) / SMOOTH_FINISH_MS)
+      );
+    }
+    const take = utf16Take(s.pending, takeChars);
+    if (take <= 0) return;
+    s.displayed += s.pending.slice(0, take);
+    s.pending = s.pending.slice(take);
+    streamUpdate(n, s.displayed);
+    scrollIfPinned();
+    if (s.finishing && !s.pending) completeSmooth(n);
+  }
+
+  function enqueueSmoothDelta(n, chunk) {
+    if (!n || !chunk) return;
+    const s = ensureSmooth(n);
+    s.pending += chunk;
+    if (!s.displayed) {
+      pumpSmooth(n, performance.now ? performance.now() : 0);
+    }
+    kickSmooth(n);
+  }
+
+  function beginSmoothFinish(n, text, thinking) {
+    if (!n) return;
+    const s = ensureSmooth(n);
+    const have = s.displayed + s.pending;
+    const next = text != null ? text : have;
+    if (next !== have) {
+      if (s.displayed && next.startsWith(s.displayed)) {
+        s.pending = next.slice(s.displayed.length);
+      } else {
+        cancelSmooth(n);
+        finalizeStream(n, next, thinking);
+        scrollIfPinned();
+        return;
+      }
+    }
+    s.finishing = true;
+    s.finishText = next;
+    s.finishThinking = thinking;
+    if (!s.pending) {
+      completeSmooth(n);
+      return;
+    }
+    s.lastTs = 0;
+    kickSmooth(n);
+  }
+
+  function completeSmooth(n) {
+    const s = n.smooth;
+    if (!s) {
+      return;
+    }
+    const text = s.finishText != null ? s.finishText : s.displayed + s.pending;
+    const thinking = s.finishThinking;
+    if (s.pending) {
+      s.displayed += s.pending;
+      s.pending = "";
+      streamUpdate(n, s.displayed);
+    }
+    cancelSmooth(n);
+    finalizeStream(n, text, thinking);
+    scrollIfPinned();
+  }
+
+  function finalizeStream(n, fullText, thinkingText) {
+    if (thinkingText != null) n.reasoning = thinkingText;
+    const prev = n.raw || "";
+    const next = fullText != null ? fullText : prev;
+
+    // Keep the live block tree. Only rebuild when the host canonical text
+    // is not an extension of what we already painted (empty → placeholder,
+    // error rewrite). Replay still goes through the streaming painter so
+    // we never snap from plain text to Markdown.
+    if (next !== prev) {
+      if (next.startsWith(prev)) {
+        streamUpdate(n, next);
+      } else {
+        n.body.innerHTML = "";
+        n.stream = null;
+        n.raw = "";
+        streamUpdate(n, next);
+      }
+    }
+    n.raw = next;
+    flushCarryFinished(n);
+
     n.stream = null;
     n.bubble.classList.remove("streaming");
     n.bubble.classList.remove("in-code");
     if (n.row) n.row.classList.remove("streaming-row");
     if (n.reasoning) setReasoning(n, n.reasoning, { streaming: false });
     else setReasoning(n, "");
-    n.body.innerHTML = renderMarkdown(n.raw || "");
     wireCodeUi(n.body);
     highlightAllIn(n.body);
     setActionsVisible(n.id || idOfNode(n), true);
@@ -1067,11 +1540,14 @@
     }
 
     if (opts.streaming && !opts.finalize) {
+      cancelSmooth(n);
       n.bubble.classList.add("streaming");
       if (n.row) n.row.classList.add("streaming-row");
       setActionsVisible(id, false);
       streamUpdate(n, text || "");
+      ensureSmooth(n).displayed = n.raw || "";
     } else {
+      cancelSmooth(n);
       finalizeStream(n, text);
     }
     scrollIfPinned();
@@ -1080,12 +1556,11 @@
   function messageDone(id, text, thinking) {
     const n = nodes.get(id);
     if (!n) return;
-    finalizeStream(
+    beginSmoothFinish(
       n,
-      text != null ? text : n.raw,
+      text != null ? text : n.smooth ? n.smooth.displayed + n.smooth.pending : n.raw,
       thinking != null ? thinking : n.reasoning
     );
-    scrollIfPinned();
   }
 
   function messageReset(id, opts) {
@@ -1096,6 +1571,7 @@
       n = nodes.get(id);
     }
     if (!n) return;
+    cancelSmooth(n);
     n.raw = opts.text || "";
     n.stream = null;
     n.bubble.classList.remove("error");
@@ -1117,6 +1593,7 @@
         collapseReasoning(n);
         streamUpdate(n, n.raw);
       }
+      ensureSmooth(n).displayed = n.raw || "";
     } else {
       n.bubble.classList.remove("streaming");
       if (n.row) n.row.classList.remove("streaming-row");
@@ -1131,6 +1608,7 @@
   function messageRemoved(id) {
     const n = nodes.get(id);
     if (!n) return;
+    cancelSmooth(n);
     if (n.row && n.row.parentNode) n.row.parentNode.removeChild(n.row);
     nodes.delete(id);
     if (nodes.size === 0) showEmpty();
@@ -1196,18 +1674,15 @@
         break;
       case "message_delta":
         {
-          const n = nodes.get(event.id);
+          let n = nodes.get(event.id);
           if (!n) {
-            addMessage(event.id, "assistant", event.text || "", {
-              streaming: true,
-            });
-            break;
+            addMessage(event.id, "assistant", "", { streaming: true });
+            n = nodes.get(event.id);
           }
-          const next = (n.raw || "") + (event.text || "");
+          if (!n) break;
           n.bubble.classList.add("streaming");
           if (n.reasoning) collapseReasoning(n);
-          streamUpdate(n, next);
-          scrollIfPinned();
+          enqueueSmoothDelta(n, event.text || "");
         }
         break;
       case "reasoning_delta":

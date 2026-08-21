@@ -162,6 +162,9 @@ def check_js_for(scope_selector: str) -> str:
         "    copyBtns: root.querySelectorAll('[data-copy]').length,"
         "    expandBtns: root.querySelectorAll('[data-expand]').length,"
         "    preCount: pres.length,"
+        "    streamProseCount: root.querySelectorAll('.stream-prose').length,"
+        "    streamFadeCount: root.querySelectorAll('.stream-fade').length,"
+        "    codeFadeCount: root.querySelectorAll('pre .stream-fade').length,"
         "    codeTexts: codeTexts,"
         "    innerHTML: root.innerHTML,"
         # Scoped strictly to .md-body (the actual sanitized-content boundary,
@@ -311,7 +314,8 @@ def main() -> int:
     win._persist_message("user", "trigger", message_id="u-live")
     win._start_assistant_stream(mode="new")
     ok = wait_until(lambda: not win._streaming, timeout=30.0)
-    pump(0.4)
+    # Display buffer may still be catching up after the host stream ends.
+    pump(1.0)
     results.check("live stream completed", ok)
     assistant_id = None
     for m in reversed(win._messages):
@@ -322,6 +326,106 @@ def main() -> int:
 
     r_live = run_dom_check(win, captured, f'[data-id="{assistant_id}"]')
     assert_no_execution_and_no_dangerous_content(results, "live/malicious", r_live)
+    results.check(
+        "[live/malicious] live tree kept (no full-body markdown replace)",
+        (r_live.get("streamProseCount") or 0) >= 1,
+        str(r_live.get("streamProseCount")),
+    )
+
+    # === [2b] Completed live stream of ordinary Markdown ===
+    # Locks that headings/lists/tables appear during the live path and survive
+    # finalize without a whole-bubble innerHTML replace.
+    print("\n[2b] Completed live assistant response (ordinary Markdown)", flush=True)
+    conv_safe = store.create_conversation(model="model-x")
+    win._conversation_id = conv_safe.id
+    win._model_session.set_current_model("model-x")
+    safe_chunks = [
+        SAFE_MD[: len(SAFE_MD) // 3],
+        SAFE_MD[len(SAFE_MD) // 3 : (2 * len(SAFE_MD)) // 3],
+        SAFE_MD[(2 * len(SAFE_MD)) // 3 :],
+    ]
+
+    def fake_chat_stream_safe(model, messages, *, cancel_event=None, **_kwargs):
+        for c in safe_chunks:
+            yield c
+
+    win.client.chat_stream = fake_chat_stream_safe
+    win._messages = []
+    win._messages.append({"id": "u-live-safe", "role": "user", "content": "trigger"})
+    win._persist_message("user", "trigger", message_id="u-live-safe")
+    win._start_assistant_stream(mode="new")
+    ok = wait_until(lambda: not win._streaming, timeout=30.0)
+    # Display buffer may still be catching up after the host stream ends.
+    pump(1.0)
+    results.check("live safe stream completed", ok)
+    safe_id = None
+    for m in reversed(win._messages):
+        if m.get("role") == "assistant":
+            safe_id = m.get("id")
+            break
+    results.check("safe assistant message id captured", safe_id is not None, str(win._messages))
+    r_live_safe = run_dom_check(win, captured, f'[data-id="{safe_id}"]')
+    assert_ordinary_markdown_intact(results, "live/safe", r_live_safe)
+    results.check(
+        "[live/safe] live tree kept (no full-body markdown replace)",
+        (r_live_safe.get("streamProseCount") or 0) >= 1,
+        str(r_live_safe.get("streamProseCount")),
+    )
+
+    # === [2c] Open fenced code is highlighted before message_done ===
+    print("\n[2c] Live open code fence is highlighted before finalize", flush=True)
+    win._transcript.post(
+        {
+            "type": "message_added",
+            "id": "m-live-hl",
+            "role": "assistant",
+            "text": "",
+            "streaming": True,
+        }
+    )
+    pump(0.05)
+    win._transcript.post(
+        {
+            "type": "message_delta",
+            "id": "m-live-hl",
+            "text": "The quick brown fox jumps over the lazy dog.",
+        }
+    )
+    pump(1.0)
+    r_live_fade = run_dom_check(win, captured, '[data-id="m-live-hl"]')
+    results.check(
+        "[live/open-fence] new prose words received a fade-in span",
+        (r_live_fade.get("streamFadeCount") or 0) >= 1,
+        str(r_live_fade.get("streamFadeCount")),
+    )
+    win._transcript.post(
+        {
+            "type": "message_delta",
+            "id": "m-live-hl",
+            "text": (
+                "\n\n```python\n"
+                "def greet(name):\n"
+                "    print(f'hello {name}')\n"
+            ),
+        }
+    )
+    pump(0.5)
+    r_live_hl = run_dom_check(win, captured, '[data-id="m-live-hl"]')
+    results.check(
+        "[live/open-fence] code card exists before message_done",
+        (r_live_hl.get("preCount") or 0) >= 1,
+        str(r_live_hl.get("preCount")),
+    )
+    results.check(
+        "[live/open-fence] fenced code is highlighted before message_done",
+        (r_live_hl.get("hljsCount") or 0) >= 1,
+        str(r_live_hl.get("hljsCount")),
+    )
+    results.check(
+        "[live/open-fence] new code text received a fade-in span",
+        (r_live_hl.get("codeFadeCount") or 0) >= 1,
+        str(r_live_hl.get("codeFadeCount")),
+    )
 
     # === [3] Non-streaming message_reset ===
     print("\n[3] Non-streaming message_reset (real messageReset() path)", flush=True)

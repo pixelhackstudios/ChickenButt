@@ -620,8 +620,11 @@ body.theme-light .edit-save {
   background: rgba(0, 0, 0, 0.08);
 }
 
-/* Cursor only on active prose while streaming (not while filling a code card) */
-.bubble.streaming:not(.in-code) .stream-prose:last-child::after,
+/* Cursor only on active prose while streaming (not while filling a code card).
+   Attach to the last markdown child so the caret stays inline with the tail,
+   not on a new line after the .stream-prose wrapper. */
+.bubble.streaming:not(.in-code) .stream-prose:last-child > :last-child::after,
+.bubble.streaming:not(.in-code) .stream-prose:last-child:empty::after,
 .bubble.streaming:not(.in-code) .md-body:empty::after {
   content: "▋";
   animation: blink 1s step-end infinite;
@@ -641,11 +644,48 @@ body.theme-light .edit-save {
   }
 }
 
+@keyframes stream-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.stream-fade {
+  animation: stream-fade-in 240ms ease-out both;
+}
+
+.bubble.md pre code .cb-code-prefix,
+.bubble.md pre code .cb-code-prefix.hljs,
+.bubble.md pre code .stream-fade {
+  display: inline;
+  font: inherit;
+  white-space: inherit;
+  /* highlight.js themes paint .hljs with their own surface; the card
+     already uses --code-bg. Keep the streaming prefix/tail transparent. */
+  background: transparent !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-fade {
+    animation: none;
+  }
+}
+
 .stream-prose {
-  white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: anywhere;
-  margin: 0.35em 0;
+  margin: 0;
+}
+
+.md-body > .stream-prose:first-child > :first-child {
+  margin-top: 0;
+}
+
+.md-body > .stream-prose:last-child > :last-child {
+  margin-bottom: 0;
 }
 
 .stream-prose:empty {

@@ -120,6 +120,7 @@ def main() -> int:
         timeout=20.0,
     )
     pump(0.3)
+    wait_until(lambda: not win._loading_model, timeout=60.0)
 
     store = ConversationStore(os.environ["CHICKENBUTT_DB"])
     target = store.create_conversation(model="m")
