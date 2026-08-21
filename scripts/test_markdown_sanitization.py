@@ -131,6 +131,9 @@ def check_js_for(scope_selector: str) -> str:
         "  window.webkit.messageHandlers.chickenbutt.postMessage({"
         "    type: 'test_md_check',"
         "    found: true,"
+        # finalizeStream() removes .streaming; until then the display buffer
+        # is still painting and the code card may not exist or be highlighted.
+        "    streaming: !!root.querySelector('.bubble.streaming'),"
         "    scriptTags: root.querySelectorAll('script').length,"
         "    iframeTags: root.querySelectorAll('iframe').length,"
         # Exclude our own trusted copy/expand icon SVGs (injected directly by
@@ -185,6 +188,25 @@ def run_dom_check(win, captured: dict, scope_selector: str, timeout: float = 10.
     eval_js(win, check_js_for(scope_selector))
     wait_until(lambda: "found" in captured, timeout=timeout)
     return dict(captured)
+
+
+def wait_for_dom(
+    win, captured: dict, scope_selector: str, ready, timeout: float = 20.0
+) -> dict:
+    """Poll the rendered DOM until `ready` holds, then return that snapshot.
+
+    The live painter drains its display buffer on requestAnimationFrame, so
+    the settled DOM lags the end of the host stream by an amount that depends
+    on machine load — a fixed pause races it on a busy CI runner. Returns the
+    last snapshot even on timeout so the caller's assertions still report the
+    real observed value rather than an empty dict.
+    """
+    deadline = time.time() + timeout
+    snapshot = run_dom_check(win, captured, scope_selector)
+    while time.time() < deadline and not ready(snapshot):
+        pump(0.1)
+        snapshot = run_dom_check(win, captured, scope_selector)
+    return snapshot
 
 
 def assert_no_execution_and_no_dangerous_content(results: Results, label: str, r: dict) -> None:
@@ -314,8 +336,6 @@ def main() -> int:
     win._persist_message("user", "trigger", message_id="u-live")
     win._start_assistant_stream(mode="new")
     ok = wait_until(lambda: not win._streaming, timeout=30.0)
-    # Display buffer may still be catching up after the host stream ends.
-    pump(1.0)
     results.check("live stream completed", ok)
     assistant_id = None
     for m in reversed(win._messages):
@@ -324,7 +344,13 @@ def main() -> int:
             break
     results.check("assistant message id captured", assistant_id is not None, str(win._messages))
 
-    r_live = run_dom_check(win, captured, f'[data-id="{assistant_id}"]')
+    # Wait for the painted result, not a guessed interval.
+    r_live = wait_for_dom(
+        win,
+        captured,
+        f'[data-id="{assistant_id}"]',
+        lambda r: r.get("found") is True and not r.get("streaming"),
+    )
     assert_no_execution_and_no_dangerous_content(results, "live/malicious", r_live)
     results.check(
         "[live/malicious] live tree kept (no full-body markdown replace)",
@@ -355,8 +381,6 @@ def main() -> int:
     win._persist_message("user", "trigger", message_id="u-live-safe")
     win._start_assistant_stream(mode="new")
     ok = wait_until(lambda: not win._streaming, timeout=30.0)
-    # Display buffer may still be catching up after the host stream ends.
-    pump(1.0)
     results.check("live safe stream completed", ok)
     safe_id = None
     for m in reversed(win._messages):
@@ -364,7 +388,15 @@ def main() -> int:
             safe_id = m.get("id")
             break
     results.check("safe assistant message id captured", safe_id is not None, str(win._messages))
-    r_live_safe = run_dom_check(win, captured, f'[data-id="{safe_id}"]')
+    # The code card is built and highlighted by finalizeStream, which runs off
+    # the display buffer's last frame. Poll for it instead of assuming it has
+    # landed within a fixed second.
+    r_live_safe = wait_for_dom(
+        win,
+        captured,
+        f'[data-id="{safe_id}"]',
+        lambda r: r.get("found") is True and not r.get("streaming"),
+    )
     assert_ordinary_markdown_intact(results, "live/safe", r_live_safe)
     results.check(
         "[live/safe] live tree kept (no full-body markdown replace)",
@@ -391,8 +423,12 @@ def main() -> int:
             "text": "The quick brown fox jumps over the lazy dog.",
         }
     )
-    pump(1.0)
-    r_live_fade = run_dom_check(win, captured, '[data-id="m-live-hl"]')
+    r_live_fade = wait_for_dom(
+        win,
+        captured,
+        '[data-id="m-live-hl"]',
+        lambda r: (r.get("streamFadeCount") or 0) >= 1,
+    )
     results.check(
         "[live/open-fence] new prose words received a fade-in span",
         (r_live_fade.get("streamFadeCount") or 0) >= 1,
@@ -409,8 +445,16 @@ def main() -> int:
             ),
         }
     )
-    pump(0.5)
-    r_live_hl = run_dom_check(win, captured, '[data-id="m-live-hl"]')
+    # Still mid-stream by design, so wait on the painted card rather than on
+    # finalize. The display buffer has to reveal the fence first.
+    r_live_hl = wait_for_dom(
+        win,
+        captured,
+        '[data-id="m-live-hl"]',
+        lambda r: (r.get("preCount") or 0) >= 1
+        and (r.get("hljsCount") or 0) >= 1
+        and (r.get("codeFadeCount") or 0) >= 1,
+    )
     results.check(
         "[live/open-fence] code card exists before message_done",
         (r_live_hl.get("preCount") or 0) >= 1,
