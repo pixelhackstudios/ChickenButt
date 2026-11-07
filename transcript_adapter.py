@@ -73,6 +73,7 @@ class TranscriptAdapter:
         self._empty_icon: Gtk.Widget | None = None
         self._empty_title: Gtk.Label | None = None
         self._empty_sub: Gtk.Label | None = None
+        self._context_marker: Gtk.Widget | None = None
 
         if self.mode == "webkit":
             try:
@@ -169,8 +170,51 @@ class TranscriptAdapter:
                 if thinking and hasattr(body, "set_reasoning"):
                     body.set_reasoning(thinking, streaming=False)
 
+    def set_context_marker(self, after_id: str | None) -> None:
+        """Show (or clear, with None) the "summarized for the model" divider."""
+        if self._web is not None:
+            if after_id:
+                self.post({"type": "context_marker", "after_id": after_id})
+            else:
+                self.post({"type": "context_marker_removed"})
+            return
+        if self._chat_box is None:
+            return
+        old = self._context_marker
+        if old is not None and old.get_parent() is self._chat_box:
+            self._chat_box.remove(old)
+        self._context_marker = None
+        row = self._native_rows.get(after_id) if after_id else None
+        if row is None or row.get_parent() is not self._chat_box:
+            return
+        marker = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        marker.add_css_class("context-marker")
+        left = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        left.set_hexpand(True)
+        left.set_valign(Gtk.Align.CENTER)
+        right = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        right.set_hexpand(True)
+        right.set_valign(Gtk.Align.CENTER)
+        label = Gtk.Label(label="Earlier messages summarized for the model")
+        label.add_css_class("dim-label")
+        label.add_css_class("caption")
+        marker.append(left)
+        marker.append(label)
+        marker.append(right)
+        self._chat_box.insert_child_after(marker, row)
+        self._context_marker = marker
+
     def remove_native_message(self, message_id: str) -> None:
         row = self._native_rows.pop(message_id, None)
+        marker = self._context_marker
+        if (
+            row is not None
+            and marker is not None
+            and self._chat_box is not None
+            and row.get_next_sibling() is marker
+        ):
+            self._chat_box.remove(marker)
+            self._context_marker = None
         if row is not None and self._chat_box is not None:
             try:
                 self._chat_box.remove(row)

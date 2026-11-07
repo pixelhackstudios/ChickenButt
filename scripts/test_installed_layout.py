@@ -62,6 +62,7 @@ REQUIRED_PY_MODULES = [
     "composer_cli.py",
     "composer_geometry.py",
     "connection_settings.py",
+    "context_compaction.py",
     "conversation_export.py",
     "conversation_lifecycle.py",
     "conversation_store.py",

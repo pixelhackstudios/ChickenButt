@@ -15,6 +15,7 @@ from model_profile import (  # noqa: E402
     ModelProfileService,
     build_options_from_prefs,
     fit_num_ctx,
+    num_ctx_for_tier,
     keep_alive_id_for_value,
 )
 from ollama_client import build_chat_body, build_generate_body  # noqa: E402
@@ -246,14 +247,14 @@ def main() -> int:
             svc.request_params("delta:4").options.get("num_ctx") == 8192,
         )
 
-        print("\n[8] Auto resolves like Fit while the maximum is known", flush=True)
+        print("\n[8] Auto always defers to Ollama's own sizing", flush=True)
         svc.ensure_digest("auto:1", "sha256:auto1")
         svc.apply_model_basics(
             "auto:1", context_tier="auto", response_style="balanced"
         )
         auto_pre = svc.request_params("auto:1")
         r.check(
-            "auto omits num_ctx until maximum is known",
+            "auto omits num_ctx while maximum unknown",
             auto_pre.options is None or "num_ctx" not in auto_pre.options,
             str(auto_pre.options),
         )
@@ -261,9 +262,8 @@ def main() -> int:
         svc.record_model_limits("auto:1", max_context=131072, digest="sha256:auto1")
         auto_post = svc.request_params("auto:1")
         r.check(
-            "auto resolves clamped num_ctx",
-            auto_post.options is not None
-            and auto_post.options.get("num_ctx") == CONTEXT_FIT_CEILING,
+            "auto still omits num_ctx once maximum is known",
+            auto_post.options is None or "num_ctx" not in auto_post.options,
             str(auto_post.options),
         )
         r.check(
@@ -272,21 +272,19 @@ def main() -> int:
             str(svc.get_profile("auto:1").get("options")),
         )
 
-        # Observations only, no prefs chosen: Auto still applies while known.
+        # Observations only, no prefs chosen: nothing is sent.
         svc.ensure_digest("auto:2", "sha256:auto2")
         svc.record_model_limits("auto:2", max_context=8192, digest="sha256:auto2")
         auto_obs = svc.request_params("auto:2")
         r.check(
-            "auto applies with observations only",
-            auto_obs.options is not None
-            and auto_obs.options.get("num_ctx") == 8192,
+            "auto omits with observations only",
+            auto_obs.options is None or "num_ctx" not in auto_obs.options,
             str(auto_obs.options),
         )
-
-        svc.ensure_digest("auto:1", "sha256:auto9")
         r.check(
-            "auto falls back to omission after digest change",
-            "num_ctx" not in (svc.request_params("auto:1").options or {}),
+            "auto tier resolver returns None",
+            num_ctx_for_tier("auto", None, model_max_ctx=131072) is None
+            and num_ctx_for_tier(None, None, model_max_ctx=8192) is None,
         )
 
     print(f"\nPhase 2 results: {len(r.ok)} passed, {len(r.fail)} failed", flush=True)

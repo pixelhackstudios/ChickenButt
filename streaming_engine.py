@@ -11,6 +11,19 @@ gi.require_version("Gtk", "4.0")
 
 from gi.repository import GLib, Gtk
 
+from context_compaction import (
+    DEFAULT_WINDOW,
+    StoredSummary,
+    TokenCalibration,
+    api_row,
+    is_api_message,
+    plan_outbound,
+    rows_tokens,
+    summary_chunks,
+    summary_reply_tokens,
+    summary_request,
+    summary_row,
+)
 from conversation_lifecycle import ConversationLifecycleController
 from conversation_store import ConversationStore
 from message_actions import MessageActionController
@@ -41,6 +54,23 @@ def continue_seed_for_stream(seed: str) -> str:
     if not seed:
         return ""
     return seed + "\n\n"
+
+
+def _linked_cancel(
+    parent: threading.Event,
+) -> tuple[threading.Event, threading.Event]:
+    """A fresh event set when *parent* is; set the second event to unlink."""
+    child = threading.Event()
+    unlink = threading.Event()
+
+    def follow() -> None:
+        while not unlink.is_set():
+            if parent.wait(0.1):
+                child.set()
+                return
+
+    threading.Thread(target=follow, daemon=True, name="cb-summary-cancel").start()
+    return child, unlink
 
 
 class StreamingEngineController:
@@ -92,6 +122,11 @@ class StreamingEngineController:
         self._streaming = False
         self._stream_generation = 0
         self._active_stream_cancel: threading.Event | None = None
+
+        # Context compaction: learned chars/token and last allocated window
+        # per model (from /api/ps), both process-local.
+        self._calibration = TokenCalibration()
+        self._window_cache: dict[str, int] = {}
 
     def is_streaming(self) -> bool:
         return self._streaming
@@ -244,6 +279,28 @@ class StreamingEngineController:
             else self._message_actions.api_messages()
         )
 
+        # Compaction works on the id-bearing history behind ``outbound``.
+        # Every caller builds outbound from the current messages, plus an
+        # optional tail (Continue's instruction row); if that ever stops
+        # holding, outbound is sent untouched.
+        history = list(self._conversation.messages)
+        base_rows = [api_row(m) for m in history if is_api_message(m)]
+        outbound_list = list(outbound)
+        extra_tail: list[dict] | None = None
+        if outbound_list[: len(base_rows)] == base_rows:
+            extra_tail = outbound_list[len(base_rows) :]
+        stored_summary: StoredSummary | None = None
+        if extra_tail is not None and origin_conversation_id:
+            try:
+                rec = self._get_store().get_context_summary(origin_conversation_id)
+            except Exception:  # noqa: BLE001
+                rec = None
+            if rec is not None:
+                stored_summary = StoredSummary(
+                    through_message_id=rec.through_message_id,
+                    content=rec.content,
+                )
+
         def still_current() -> bool:
             if my_generation != self._stream_generation:
                 return False
@@ -342,8 +399,37 @@ class StreamingEngineController:
             try:
                 # params / show_reasoning resolved on the UI thread before
                 # begin_stream so Continue seed painting stays gated.
+                send_rows = outbound_list
+                window = DEFAULT_WINDOW
+                if extra_tail is not None and origin_model:
+                    window = self._context_window(origin_model, params)
+                    try:
+                        send_rows = self._compact_outbound(
+                            model=origin_model,
+                            history=history,
+                            extra_tail=extra_tail,
+                            summary=stored_summary,
+                            window=window,
+                            params=params,
+                            cancel_event=cancel_event,
+                            conversation_id=origin_conversation_id or "",
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        # Compaction must never cost the user their reply.
+                        print(f"context compaction skipped: {exc}", flush=True)
+                        send_rows = outbound_list
 
                 def _on_done(chunk: dict) -> None:
+                    if origin_model and isinstance(chunk, dict):
+                        try:
+                            self._calibration.observe(
+                                origin_model,
+                                rows=send_rows,
+                                prompt_eval_count=chunk.get("prompt_eval_count"),
+                                window=window,
+                            )
+                        except Exception:  # noqa: BLE001
+                            pass
                     if self._on_generation_done is None or not origin_model:
                         return
                     try:
@@ -360,12 +446,12 @@ class StreamingEngineController:
 
                 for piece in self.client.chat_stream(
                     origin_model,
-                    list(outbound),
+                    list(send_rows),
                     cancel_event=cancel_event,
                     options=params.options,
                     keep_alive=params.keep_alive,
                     think=params.think,
-                    on_done=_on_done if self._on_generation_done is not None else None,
+                    on_done=_on_done,
                     on_thinking=_on_thinking,
                 ):
                     collected.append(piece)
@@ -379,6 +465,166 @@ class StreamingEngineController:
                     state["streaming"] = False
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _context_window(self, model: str, params: RequestParams) -> int:
+        """Window the request will run in (worker thread).
+
+        An explicit num_ctx wins; Auto uses what Ollama allocated for the
+        loaded model (/api/ps), then the last value seen, then 4096.
+        """
+        opts = params.options or {}
+        n = opts.get("num_ctx")
+        if isinstance(n, int) and not isinstance(n, bool) and n > 0:
+            return n
+        try:
+            for row in self.client.list_running_models_detail():
+                if row.name == model or row.model == model:
+                    ctx = row.context_length
+                    if isinstance(ctx, int) and ctx > 0:
+                        self._window_cache[model] = ctx
+                        return ctx
+        except Exception:  # noqa: BLE001
+            pass
+        return self._window_cache.get(model, DEFAULT_WINDOW)
+
+    def _compact_outbound(
+        self,
+        *,
+        model: str,
+        history: list[dict],
+        extra_tail: list[dict],
+        summary: StoredSummary | None,
+        window: int,
+        params: RequestParams,
+        cancel_event: threading.Event,
+        conversation_id: str,
+    ) -> list[dict]:
+        """Fit history into *window*; may summarize (worker thread)."""
+        cpt = self._calibration.chars_per_token(model)
+        npred = (params.options or {}).get("num_predict")
+        plan = plan_outbound(
+            history,
+            window=window,
+            summary=summary,
+            num_predict=npred if isinstance(npred, int) else None,
+            chars_per_token=cpt,
+            extra_tail_tokens=rows_tokens(extra_tail, cpt),
+        )
+        rows = list(plan.rows)
+        marker: str | None = (
+            plan.used_summary.through_message_id if plan.used_summary else None
+        )
+        if plan.oversize:
+            print(
+                "context: latest message alone exceeds the context window",
+                flush=True,
+            )
+        if plan.needs_summary and plan.summary_through_id:
+            GLib.idle_add(self._set_status, "Summarizing earlier messages…")
+            new = self._summarize(
+                model,
+                prior=plan.prior_summary,
+                messages=list(plan.to_summarize),
+                window=window,
+                cpt=cpt,
+                params=params,
+                cancel_event=cancel_event,
+            )
+            if new:
+                rows = [summary_row(new)] + list(plan.kept_rows)
+                marker = plan.summary_through_id
+                GLib.idle_add(
+                    self._persist_summary,
+                    conversation_id,
+                    plan.summary_through_id,
+                    new,
+                    model,
+                )
+            if not cancel_event.is_set():
+                GLib.idle_add(self._set_status, "Thinking…")
+        if summary is not None or marker is not None:
+            GLib.idle_add(self._show_context_marker, conversation_id, marker)
+        return rows + list(extra_tail)
+
+    def _summarize(
+        self,
+        model: str,
+        *,
+        prior: str,
+        messages: list[dict],
+        window: int,
+        cpt: float,
+        params: RequestParams,
+        cancel_event: threading.Event,
+    ) -> str | None:
+        """Rolling summary of *messages* on top of *prior*; None on failure."""
+        options = dict(params.options or {})
+        options.pop("num_predict", None)
+        # A reply cap would starve a thinking model of visible output.
+        if params.think is False:
+            options["num_predict"] = summary_reply_tokens(window)
+        current = prior
+        try:
+            for lines in summary_chunks(messages, window=window, chars_per_token=cpt):
+                if cancel_event.is_set():
+                    return None
+                pieces: list[str] = []
+                # chat_stream sets the event it is given when it finishes
+                # (to release its socket watcher), so each call gets its own
+                # event that follows the reply's Stop.
+                call_cancel, unlink = _linked_cancel(cancel_event)
+                try:
+                    for piece in self.client.chat_stream(
+                        model,
+                        summary_request(current, lines),
+                        cancel_event=call_cancel,
+                        options=options or None,
+                        keep_alive=params.keep_alive,
+                        think=params.think,
+                    ):
+                        pieces.append(piece)
+                finally:
+                    unlink.set()
+                if cancel_event.is_set():
+                    return None
+                text = "".join(pieces).strip()
+                if not text:
+                    return None
+                current = text
+        except OllamaError as exc:
+            print(f"context summary failed: {exc}", flush=True)
+            return None
+        except Exception as exc:  # noqa: BLE001
+            print(f"context summary failed: {exc}", flush=True)
+            return None
+        return current if current.strip() else None
+
+    def _persist_summary(
+        self, conversation_id: str, through_id: str, content: str, model: str
+    ) -> bool:
+        """Store a new summary (main thread). Anchor must still exist."""
+        if not conversation_id or not through_id:
+            return False
+        try:
+            self._get_store().set_context_summary(
+                conversation_id,
+                through_message_id=through_id,
+                content=content,
+                model=model,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"context summary persist: {exc}", flush=True)
+        return False
+
+    def _show_context_marker(self, conversation_id: str, after_id: str | None) -> bool:
+        """Divider where the model's memory starts (main thread)."""
+        if conversation_id != self._conversation.conversation_id:
+            return False
+        try:
+            self._transcript.set_context_marker(after_id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"context marker: {exc}", flush=True)
+        return False
 
     def commit_assistant_result(
         self,

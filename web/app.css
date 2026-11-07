@@ -150,6 +150,25 @@ body.theme-dark {
   width: 100%;
 }
 
+/* Where the model's memory starts: older messages reach it as a summary. */
+.context-marker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+  user-select: none;
+}
+
+.context-marker::before,
+.context-marker::after {
+  content: "";
+  flex: 1 1 auto;
+  border-top: 1px solid currentColor;
+  opacity: 0.5;
+}
+
 .row.user {
   flex-direction: row-reverse;
 }

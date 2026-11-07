@@ -351,8 +351,33 @@
     messagesEl.hidden = false;
   }
 
+  // Divider after the last message the model now sees only as a summary.
+  let contextMarkerEl = null;
+
+  function clearContextMarker() {
+    if (contextMarkerEl && contextMarkerEl.parentNode) {
+      contextMarkerEl.parentNode.removeChild(contextMarkerEl);
+    }
+    contextMarkerEl = null;
+  }
+
+  function setContextMarker(afterId) {
+    clearContextMarker();
+    const n = afterId ? nodes.get(afterId) : null;
+    if (!n || !n.row || !n.row.parentNode) return;
+    const el = document.createElement("div");
+    el.className = "context-marker";
+    el.setAttribute("role", "separator");
+    const label = document.createElement("span");
+    label.textContent = "Earlier messages summarized for the model";
+    el.appendChild(label);
+    n.row.parentNode.insertBefore(el, n.row.nextSibling);
+    contextMarkerEl = el;
+  }
+
   function showEmpty() {
     nodes.forEach((n) => cancelSmooth(n));
+    contextMarkerEl = null;
     emptyEl.hidden = false;
     messagesEl.hidden = true;
     messagesEl.innerHTML = "";
@@ -1702,6 +1727,9 @@
     const n = nodes.get(id);
     if (!n) return;
     cancelSmooth(n);
+    if (contextMarkerEl && n.row && n.row.nextSibling === contextMarkerEl) {
+      clearContextMarker();
+    }
     if (n.row && n.row.parentNode) n.row.parentNode.removeChild(n.row);
     nodes.delete(id);
     if (nodes.size === 0) showEmpty();
@@ -1824,6 +1852,12 @@
         break;
       case "message_removed":
         messageRemoved(event.id);
+        break;
+      case "context_marker":
+        setContextMarker(event.after_id || "");
+        break;
+      case "context_marker_removed":
+        clearContextMarker();
         break;
       case "theme_changed":
         {

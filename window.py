@@ -278,7 +278,7 @@ class ChatSidebar(Adw.ApplicationWindow):
             reset_greetings=self._model_session.reset_greetings,
             clear_native_rows=self._transcript.clear_native_rows,
             render_empty_transcript=self._transcript.render_empty,
-            apply_restored_transcript=self._transcript.replay,
+            apply_restored_transcript=self._replay_with_context_marker,
             mark_history_dirty=self._sidebar_history.mark_dirty,
             rebuild_history_list=self._sidebar_history.rebuild_history_list,
             refresh_chat_title=self._sidebar_history.refresh_chat_title,
@@ -964,6 +964,18 @@ class ChatSidebar(Adw.ApplicationWindow):
     def _render_empty_transcript(self) -> None:
         """Compatibility delegator for retained transcript consumers and tests."""
         self._transcript.render_empty()
+
+    def _replay_with_context_marker(self, messages: list[dict]) -> None:
+        """Replay a restored conversation, then its compaction divider."""
+        self._transcript.replay(messages)
+        try:
+            cid = self._conversation.conversation_id
+            summary = self._store.get_context_summary(cid) if cid else None
+        except Exception as exc:  # noqa: BLE001
+            print(f"context summary lookup: {exc}", flush=True)
+            summary = None
+        if summary is not None:
+            self._transcript.set_context_marker(summary.through_message_id)
 
     def _apply_restored_transcript(self, messages: list[dict]) -> None:
         """Replay messages; paint thinking only when Show reasoning is on."""

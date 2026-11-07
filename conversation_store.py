@@ -15,7 +15,7 @@ from typing import Any
 
 from gi.repository import GLib
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def default_db_path() -> Path:
@@ -47,6 +47,21 @@ class StoredMessage:
     created_at: float
     seq: int
     thinking: str = ""
+
+
+@dataclass
+class ContextSummary:
+    """Rolling summary sent in place of messages up to ``through_seq``.
+
+    Request-side only: the stored messages and the transcript are untouched.
+    """
+
+    conversation_id: str
+    through_message_id: str
+    through_seq: int
+    content: str
+    model: str | None
+    created_at: float
 
 
 class ConversationStore:
@@ -103,6 +118,16 @@ class ConversationStore:
 
             CREATE INDEX IF NOT EXISTS idx_conversations_updated
                 ON conversations(updated_at DESC);
+
+            CREATE TABLE IF NOT EXISTS context_summaries (
+                conversation_id TEXT PRIMARY KEY
+                    REFERENCES conversations(id) ON DELETE CASCADE,
+                through_message_id TEXT NOT NULL,
+                through_seq INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                model TEXT,
+                created_at REAL NOT NULL
+            );
             """
         )
         def _ensure_thinking_column() -> None:
@@ -491,7 +516,88 @@ class ConversationStore:
             for r in rows
         ]
 
+    def get_context_summary(self, conversation_id: str) -> ContextSummary | None:
+        row = self._conn.execute(
+            "SELECT * FROM context_summaries WHERE conversation_id = ?",
+            (conversation_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return ContextSummary(
+            conversation_id=row["conversation_id"],
+            through_message_id=row["through_message_id"],
+            through_seq=int(row["through_seq"]),
+            content=row["content"],
+            model=row["model"],
+            created_at=float(row["created_at"]),
+        )
+
+    def set_context_summary(
+        self,
+        conversation_id: str,
+        *,
+        through_message_id: str,
+        content: str,
+        model: str | None = None,
+    ) -> ContextSummary | None:
+        """Store the summary; None (nothing written) if the anchor is gone."""
+        row = self._conn.execute(
+            "SELECT seq FROM messages WHERE id = ? AND conversation_id = ?",
+            (through_message_id, conversation_id),
+        ).fetchone()
+        if row is None or not (content or "").strip():
+            return None
+        ts = self._now()
+        seq = int(row["seq"])
+        self._conn.execute(
+            """
+            INSERT INTO context_summaries(
+                conversation_id, through_message_id, through_seq,
+                content, model, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(conversation_id) DO UPDATE SET
+                through_message_id = excluded.through_message_id,
+                through_seq = excluded.through_seq,
+                content = excluded.content,
+                model = excluded.model,
+                created_at = excluded.created_at
+            """,
+            (conversation_id, through_message_id, seq, content, model, ts),
+        )
+        return ContextSummary(
+            conversation_id=conversation_id,
+            through_message_id=through_message_id,
+            through_seq=seq,
+            content=content,
+            model=model,
+            created_at=ts,
+        )
+
+    def clear_context_summary(self, conversation_id: str) -> None:
+        self._conn.execute(
+            "DELETE FROM context_summaries WHERE conversation_id = ?",
+            (conversation_id,),
+        )
+
+    def _invalidate_summary_covering(self, message_id: str) -> None:
+        """Drop a summary that covers *message_id* (it changed or went away)."""
+        row = self._conn.execute(
+            "SELECT conversation_id, seq FROM messages WHERE id = ?",
+            (message_id,),
+        ).fetchone()
+        if row is None:
+            return
+        self._conn.execute(
+            """
+            DELETE FROM context_summaries
+            WHERE conversation_id = ? AND through_seq >= ?
+            """,
+            (row["conversation_id"], int(row["seq"])),
+        )
+
     def delete_message(self, message_id: str, *, conversation_id: str | None = None) -> None:
+        self._invalidate_summary_covering(message_id)
         cid = conversation_id
         if cid is None:
             row = self._conn.execute(
@@ -523,6 +629,7 @@ class ConversationStore:
                 self._conn.execute("ROLLBACK")
                 raise KeyError(f"message not found: {message_id}")
             cid = row["conversation_id"]
+            self._invalidate_summary_covering(message_id)
             if thinking is not None:
                 self._conn.execute(
                     """
@@ -570,6 +677,10 @@ class ConversationStore:
         """Wipe messages but keep the conversation row (active session)."""
         self._conn.execute("BEGIN")
         try:
+            self._conn.execute(
+                "DELETE FROM context_summaries WHERE conversation_id = ?",
+                (conversation_id,),
+            )
             self._conn.execute(
                 "DELETE FROM messages WHERE conversation_id = ?",
                 (conversation_id,),

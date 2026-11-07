@@ -175,6 +175,8 @@ class ConnectionPreferences:
         self._apply_form(show_errors=False)
         self._save_model_prefs()
         self._bound_model = None
+        # (model, context_length) Ollama last reported for a loaded model.
+        self._allocated_ctx: tuple[str, int] | None = None
 
     def refresh_selected_model(self) -> None:
         """Reload model controls for the window's current model (no cross-leak)."""
@@ -723,10 +725,26 @@ class ConnectionPreferences:
         """Explain the Auto/Fit tier's resolved size; no subtitle for fixed tiers."""
         if self._context_row is None:
             return
-        if self._combo_id(self._context_row, CONTEXT_TIER_IDS) not in ("auto", "fit"):
+        tier = self._combo_id(self._context_row, CONTEXT_TIER_IDS)
+        if tier not in ("auto", "fit"):
             self._context_row.set_subtitle("")
             return
         model = self._bound_model
+        if tier == "auto":
+            alloc = self._allocated_ctx
+            if model and alloc is not None and alloc[0] == model:
+                text = (
+                    f"Sized by Ollama for this machine — currently "
+                    f"{format_tokens(alloc[1])} tokens. Long chats are "
+                    "summarized to fit."
+                )
+            else:
+                text = (
+                    "Sized by Ollama for this machine when the model loads. "
+                    "Long chats are summarized to fit."
+                )
+            self._context_row.set_subtitle(_markup_safe(text))
+            return
         max_ctx = self._profiles.max_context(model) if model else None
         resolved = fit_num_ctx(max_ctx)
         if resolved is None:
@@ -920,6 +938,10 @@ class ConnectionPreferences:
             if model == self._bound_model:
                 self._update_context_row_subtitle()
         allocated = running.context_length if running is not None else None
+        if isinstance(allocated, int) and allocated > 0:
+            self._allocated_ctx = (model, allocated)
+            if model == self._bound_model:
+                self._update_context_row_subtitle()
         self._apply_conversation_usage(
             model=model,
             allocated_ctx=allocated,
@@ -968,8 +990,8 @@ class ConnectionPreferences:
                 self._fit_warning_row.set_visible(True)
                 self._fit_warning_row.set_subtitle(
                     "This conversation is approaching the context limit. "
-                    "Older messages may soon be removed or summarized by the "
-                    "model runtime — ChickenButt does not truncate chat here."
+                    "ChickenButt will summarize older messages for the model "
+                    "automatically; the full chat stays in your history."
                 )
             else:
                 self._fit_warning_row.set_visible(False)

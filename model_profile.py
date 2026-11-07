@@ -17,7 +17,9 @@ from typing import Any
 
 import app_settings as _app_settings
 
-# Context tiers (orthogonal to response style). "auto" omits num_ctx.
+# Context tiers (orthogonal to response style). "auto" omits num_ctx so the
+# Ollama server sizes the window for the hardware it actually sees; long
+# conversations are kept inside that window by context_compaction.
 CONTEXT_TIER_IDS: tuple[str, ...] = ("auto", "fit", "4k", "8k", "16k", "32k", "custom")
 CONTEXT_TIER_LABELS: tuple[str, ...] = (
     "Auto",
@@ -111,12 +113,14 @@ def num_ctx_for_tier(
 ) -> int | None:
     """Resolve num_ctx for a tier; None means omit from the request.
 
-    ``auto`` (missing or explicit) resolves like ``fit``: the model's
-    observed maximum clamped to the fit ceiling, or None while unknown so
-    Ollama's default applies.
+    ``auto`` (missing or explicit) always omits num_ctx: Ollama sizes the
+    window from the GPU it runs on. ``fit`` is the model's observed maximum
+    clamped to the fit ceiling, or None while unknown.
     """
     tid = (tier or "auto").lower()
-    if tid in ("auto", "fit"):
+    if tid == "auto":
+        return None
+    if tid == "fit":
         return fit_num_ctx(model_max_ctx)
     if tid == "custom":
         if isinstance(options, dict):
@@ -176,7 +180,10 @@ def build_options_from_prefs(
     options: dict[str, Any] = dict(base_options) if base_options else {}
 
     tier = (context_tier or "auto").lower()
-    if tier in ("auto", "fit"):
+    if tier == "auto":
+        # Ollama sizes the window for its own hardware.
+        options.pop("num_ctx", None)
+    elif tier == "fit":
         # Resolved per request from the observed maximum; nothing is stored,
         # so a model swap or a re-pull re-resolves instead of going stale.
         # Unknown maximum omits num_ctx (Ollama default) until it is read.
@@ -358,9 +365,8 @@ class ModelProfileService:
     def request_params(self, model_name: str) -> RequestParams:
         """Effective request parameters for chat/load; empty when unset.
 
-        ``auto`` (explicit or missing tier) resolves to the observed model
-        maximum clamped to the fit ceiling while it is known, and omits
-        num_ctx (Ollama default) while unknown. Fixed tiers are untouched.
+        ``auto`` (explicit or missing tier) omits num_ctx so Ollama sizes
+        the window for its hardware. Fixed tiers are untouched.
         """
         profile = self.get_profile(model_name)
         if not profile:
@@ -402,10 +408,8 @@ class ModelProfileService:
         elif stored:
             options = dict(stored)
         else:
-            # Observations only (e.g. max_context already read, no prefs
-            # chosen yet): Auto still applies while known, else omit.
-            nctx = fit_num_ctx(max_ctx)
-            options = {"num_ctx": nctx} if nctx is not None else None
+            # Observations only (no prefs chosen yet): Auto omits num_ctx.
+            options = None
 
         keep_alive = profile.get("keep_alive", None)
         if keep_alive is not None and not isinstance(keep_alive, (str, int, float)):
