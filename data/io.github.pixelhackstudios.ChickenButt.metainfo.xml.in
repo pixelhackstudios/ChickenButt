@@ -48,7 +48,12 @@
   </screenshots>
 
   <releases>
-    <release version="@VERSION@" date="2026-08-20">
+    <release version="@VERSION@" date="2026-11-07">
+      <description>
+        <p>Version 1.2.0: Auto context now picks the model's supported size on its own, capped at 32K, and falls back to Ollama's default while the limit is still unknown. Fixed sizes still do exactly what you choose.</p>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-08-20">
       <description>
         <p>Version 1.1.0: Sending a prompt now lifts that message to the top of the transcript and the reply fills downward from there, keeping the current exchange in view instead of the transcript hugging the bottom. Reopening a conversation still lands at the most recent message.</p>
       </description>
