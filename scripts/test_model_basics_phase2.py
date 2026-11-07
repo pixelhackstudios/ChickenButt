@@ -246,6 +246,49 @@ def main() -> int:
             svc.request_params("delta:4").options.get("num_ctx") == 8192,
         )
 
+        print("\n[8] Auto resolves like Fit while the maximum is known", flush=True)
+        svc.ensure_digest("auto:1", "sha256:auto1")
+        svc.apply_model_basics(
+            "auto:1", context_tier="auto", response_style="balanced"
+        )
+        auto_pre = svc.request_params("auto:1")
+        r.check(
+            "auto omits num_ctx until maximum is known",
+            auto_pre.options is None or "num_ctx" not in auto_pre.options,
+            str(auto_pre.options),
+        )
+
+        svc.record_model_limits("auto:1", max_context=131072, digest="sha256:auto1")
+        auto_post = svc.request_params("auto:1")
+        r.check(
+            "auto resolves clamped num_ctx",
+            auto_post.options is not None
+            and auto_post.options.get("num_ctx") == CONTEXT_FIT_CEILING,
+            str(auto_post.options),
+        )
+        r.check(
+            "auto stores no num_ctx in preferences",
+            "num_ctx" not in (svc.get_profile("auto:1").get("options") or {}),
+            str(svc.get_profile("auto:1").get("options")),
+        )
+
+        # Observations only, no prefs chosen: Auto still applies while known.
+        svc.ensure_digest("auto:2", "sha256:auto2")
+        svc.record_model_limits("auto:2", max_context=8192, digest="sha256:auto2")
+        auto_obs = svc.request_params("auto:2")
+        r.check(
+            "auto applies with observations only",
+            auto_obs.options is not None
+            and auto_obs.options.get("num_ctx") == 8192,
+            str(auto_obs.options),
+        )
+
+        svc.ensure_digest("auto:1", "sha256:auto9")
+        r.check(
+            "auto falls back to omission after digest change",
+            "num_ctx" not in (svc.request_params("auto:1").options or {}),
+        )
+
     print(f"\nPhase 2 results: {len(r.ok)} passed, {len(r.fail)} failed", flush=True)
     if r.fail:
         print("FAILED:", ", ".join(r.fail), flush=True)

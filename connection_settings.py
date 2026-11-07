@@ -720,10 +720,10 @@ class ConnectionPreferences:
             self._fit_warning_row.set_subtitle("")
 
     def _update_context_row_subtitle(self) -> None:
-        """Explain the Fit tier's resolved size; no subtitle for fixed tiers."""
+        """Explain the Auto/Fit tier's resolved size; no subtitle for fixed tiers."""
         if self._context_row is None:
             return
-        if self._combo_id(self._context_row, CONTEXT_TIER_IDS) != "fit":
+        if self._combo_id(self._context_row, CONTEXT_TIER_IDS) not in ("auto", "fit"):
             self._context_row.set_subtitle("")
             return
         model = self._bound_model

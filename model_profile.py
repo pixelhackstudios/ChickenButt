@@ -109,9 +109,14 @@ def num_ctx_for_tier(
     *,
     model_max_ctx: int | None = None,
 ) -> int | None:
-    """Resolve num_ctx for a tier; None means omit from the request."""
+    """Resolve num_ctx for a tier; None means omit from the request.
+
+    ``auto`` (missing or explicit) resolves like ``fit``: the model's
+    observed maximum clamped to the fit ceiling, or None while unknown so
+    Ollama's default applies.
+    """
     tid = (tier or "auto").lower()
-    if tid == "fit":
+    if tid in ("auto", "fit"):
         return fit_num_ctx(model_max_ctx)
     if tid == "custom":
         if isinstance(options, dict):
@@ -171,11 +176,10 @@ def build_options_from_prefs(
     options: dict[str, Any] = dict(base_options) if base_options else {}
 
     tier = (context_tier or "auto").lower()
-    if tier == "auto":
-        options.pop("num_ctx", None)
-    elif tier == "fit":
+    if tier in ("auto", "fit"):
         # Resolved per request from the observed maximum; nothing is stored,
         # so a model swap or a re-pull re-resolves instead of going stale.
+        # Unknown maximum omits num_ctx (Ollama default) until it is read.
         nctx = fit_num_ctx(model_max_ctx)
         if nctx is not None:
             options["num_ctx"] = nctx
@@ -354,13 +358,15 @@ class ModelProfileService:
     def request_params(self, model_name: str) -> RequestParams:
         """Effective request parameters for chat/load; empty when unset.
 
-        Optional fields are omitted when the profile has no preferences so the
-        chat body stays identical to pre-profile ChickenButt.
+        ``auto`` (explicit or missing tier) resolves to the observed model
+        maximum clamped to the fit ceiling while it is known, and omits
+        num_ctx (Ollama default) while unknown. Fixed tiers are untouched.
         """
         profile = self.get_profile(model_name)
         if not profile:
             return RequestParams()
 
+        max_ctx = max_context_from_profile(profile)
         options_raw = profile.get("options")
         stored: dict[str, Any] = (
             dict(options_raw) if isinstance(options_raw, dict) else {}
@@ -391,12 +397,15 @@ class ModelProfileService:
                 temperature_custom=float(temp_custom) if temp_custom is not None else None,
                 num_predict=int(npred) if npred is not None else None,
                 base_options=stored or None,
-                model_max_ctx=max_context_from_profile(profile),
+                model_max_ctx=max_ctx,
             )
         elif stored:
             options = dict(stored)
         else:
-            options = None
+            # Observations only (e.g. max_context already read, no prefs
+            # chosen yet): Auto still applies while known, else omit.
+            nctx = fit_num_ctx(max_ctx)
+            options = {"num_ctx": nctx} if nctx is not None else None
 
         keep_alive = profile.get("keep_alive", None)
         if keep_alive is not None and not isinstance(keep_alive, (str, int, float)):
