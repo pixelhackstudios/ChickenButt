@@ -25,6 +25,38 @@ def _use_pointer_cursor(widget: Gtk.Widget) -> None:
         pass
 
 
+def setup_model_name_item(_factory: Gtk.SignalListItemFactory, item: Gtk.ListItem) -> None:
+    """Create the truncated label used for a model dropdown row."""
+    label = Gtk.Label()
+    label.set_xalign(0)
+    label.set_ellipsize(Pango.EllipsizeMode.MIDDLE)
+    label.set_max_width_chars(36)
+    item.set_child(label)
+
+
+def bind_model_name_item(_factory: Gtk.SignalListItemFactory, item: Gtk.ListItem) -> None:
+    """Fill a model dropdown row; the full name stays on the tooltip."""
+    label = item.get_child()
+    obj = item.get_item()
+    text = obj.get_string() if isinstance(obj, Gtk.StringObject) else ""
+    if isinstance(label, Gtk.Label):
+        label.set_text(text or "")
+        label.set_tooltip_text(text or "")
+
+
+def _model_name_label_factory() -> Gtk.SignalListItemFactory:
+    """List-item factory showing model names truncated with an ellipsis.
+
+    Long registry-style names (e.g. ``hf.co/...:Q4_K_M``) must not force
+    the sidebar wider — the label keeps at most 36 characters and the
+    full name remains available as a tooltip.
+    """
+    factory = Gtk.SignalListItemFactory()
+    factory.connect("setup", setup_model_name_item)
+    factory.connect("bind", bind_model_name_item)
+    return factory
+
+
 @dataclass(frozen=True)
 class HistorySidebarWidgets:
     root: Gtk.Box
@@ -128,6 +160,8 @@ def build_history_sidebar(*, width: int) -> HistorySidebarWidgets:
     model_combo.set_halign(Gtk.Align.FILL)
     model_combo.set_valign(Gtk.Align.CENTER)
     model_combo.set_size_request(-1, 38)
+    model_combo.set_factory(_model_name_label_factory())
+    model_combo.set_list_factory(_model_name_label_factory())
     _use_pointer_cursor(model_combo)
     model_box.append(model_combo)
     model_block.append(model_box)

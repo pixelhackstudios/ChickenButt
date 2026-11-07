@@ -42,7 +42,7 @@ import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, GLib, GObject, Gtk  # noqa: E402
+from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango  # noqa: E402
 
 import conversation_export as export_module  # noqa: E402
 import health_probe as health_probe_module  # noqa: E402
@@ -8314,6 +8314,51 @@ def main() -> int:
     w, h = win.model_combo.get_size_request()
     results.check("model dropdown is no longer fixed to 320px wide", w != 320, f"size_request={(w, h)}")
     results.check("model dropdown keeps its 38px height", h == 38, f"size_request={(w, h)}")
+    long_name = "hf.co/mradermacher/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic-i1-GGUF:Q4_K_M"
+    for factory_kind in ("factory", "list_factory"):
+        factory = (
+            win.model_combo.get_factory()
+            if factory_kind == "factory"
+            else win.model_combo.get_list_factory()
+        )
+        results.check(f"model dropdown {factory_kind} truncates long names", factory is not None, str(factory))
+    from window_view import bind_model_name_item, setup_model_name_item
+
+    class _FakeItem:
+        def __init__(self) -> None:
+            self._child = None
+            self._obj = Gtk.StringObject.new(long_name)
+
+        def set_child(self, child) -> None:
+            self._child = child
+
+        def get_child(self):
+            return self._child
+
+        def get_item(self):
+            return self._obj
+
+    probe = _FakeItem()
+    setup_model_name_item(None, probe)
+    bind_model_name_item(None, probe)
+    lab = probe.get_child()
+    results.check(
+        "model dropdown label ellipsizes instead of widening the panel",
+        isinstance(lab, Gtk.Label)
+        and lab.get_ellipsize() != Pango.EllipsizeMode.NONE,
+        str(lab.get_ellipsize() if isinstance(lab, Gtk.Label) else lab),
+    )
+    results.check(
+        "model dropdown label caps width below the long name",
+        isinstance(lab, Gtk.Label)
+        and 0 < lab.get_max_width_chars() < len(long_name),
+        str(lab.get_max_width_chars() if isinstance(lab, Gtk.Label) else lab),
+    )
+    results.check(
+        "model dropdown label keeps the full name as tooltip",
+        isinstance(lab, Gtk.Label) and lab.get_tooltip_text() == long_name,
+        str(lab.get_tooltip_text() if isinstance(lab, Gtk.Label) else lab),
+    )
 
     # === [4] Health banner stays in the main chat column ===
     print("\n[4] Health banner location", flush=True)
