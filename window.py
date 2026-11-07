@@ -733,7 +733,7 @@ class ChatSidebar(Adw.ApplicationWindow):
         self._sidebar_history.toggle_sidebar(show)
 
     def _note_model_digest(self, model: str) -> None:
-        """Resolve digest for *model* and apply name/digest profile policy.
+        """Resolve digest + maximum context for *model* and apply profile policy.
 
         Best-effort background work: offline or show failures leave
         preferences untouched. Does not block the UI thread on HTTP.
@@ -743,21 +743,34 @@ class ChatSidebar(Adw.ApplicationWindow):
 
         def work() -> None:
             digest: str | None = None
+            max_ctx: int | None = None
             try:
                 for desc in self.client.list_models_detail():
                     if desc.name == model and desc.digest:
                         digest = desc.digest
                         break
-                if digest is None:
-                    shown = self.client.show_model(model)
-                    digest = shown.digest
             except Exception:  # noqa: BLE001
                 digest = None
+            try:
+                shown = self.client.show_model(model)
+                max_ctx = shown.context_length
+                if digest is None:
+                    digest = shown.digest
+            except Exception:  # noqa: BLE001
+                pass
             if digest:
                 try:
                     self._model_profiles.ensure_digest(model, digest)
                 except Exception as exc:  # noqa: BLE001
                     print(f"model digest note failed: {exc}", flush=True)
+            if max_ctx:
+                # Feeds the "Fit to model" context tier; harmless otherwise.
+                try:
+                    self._model_profiles.record_model_limits(
+                        model, max_context=max_ctx, digest=digest
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    print(f"model limits note failed: {exc}", flush=True)
 
         threading.Thread(target=work, daemon=True, name="cb-model-digest").start()
 

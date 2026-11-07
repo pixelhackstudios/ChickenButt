@@ -18,9 +18,10 @@ from typing import Any
 import app_settings as _app_settings
 
 # Context tiers (orthogonal to response style). "auto" omits num_ctx.
-CONTEXT_TIER_IDS: tuple[str, ...] = ("auto", "4k", "8k", "16k", "32k", "custom")
+CONTEXT_TIER_IDS: tuple[str, ...] = ("auto", "fit", "4k", "8k", "16k", "32k", "custom")
 CONTEXT_TIER_LABELS: tuple[str, ...] = (
     "Auto",
+    "Fit to model",
     "4K",
     "8K",
     "16K",
@@ -29,12 +30,18 @@ CONTEXT_TIER_LABELS: tuple[str, ...] = (
 )
 CONTEXT_TIER_NUM_CTX: dict[str, int | None] = {
     "auto": None,
+    "fit": None,  # resolved from the model's observed maximum
     "4k": 4096,
     "8k": 8192,
     "16k": 16384,
     "32k": 32768,
     "custom": None,  # use options.num_ctx
 }
+
+# Ceiling for the "fit" tier. A model's advertised maximum (131072 and up is
+# common) would size a KV cache far past most local GPUs, so "fit" tracks the
+# model only until this point. Larger windows stay a deliberate Custom choice.
+CONTEXT_FIT_CEILING = 32768
 
 # Response style temperatures (orthogonal to context).
 RESPONSE_STYLE_IDS: tuple[str, ...] = ("precise", "balanced", "creative", "custom")
@@ -80,9 +87,32 @@ _PREFERENCE_KEYS = (
 )
 
 
-def num_ctx_for_tier(tier: str | None, options: dict[str, Any] | None = None) -> int | None:
+def fit_num_ctx(model_max_ctx: int | None) -> int | None:
+    """Clamp a model's maximum context to the "fit" ceiling.
+
+    None (unknown maximum) means omit num_ctx, so "fit" degrades to "auto"
+    until the model's limits have been observed.
+    """
+    if model_max_ctx is None or isinstance(model_max_ctx, bool):
+        return None
+    if not isinstance(model_max_ctx, (int, float)) or model_max_ctx != model_max_ctx:
+        return None
+    n = int(model_max_ctx)
+    if n <= 0:
+        return None
+    return min(n, CONTEXT_FIT_CEILING)
+
+
+def num_ctx_for_tier(
+    tier: str | None,
+    options: dict[str, Any] | None = None,
+    *,
+    model_max_ctx: int | None = None,
+) -> int | None:
     """Resolve num_ctx for a tier; None means omit from the request."""
     tid = (tier or "auto").lower()
+    if tid == "fit":
+        return fit_num_ctx(model_max_ctx)
     if tid == "custom":
         if isinstance(options, dict):
             raw = options.get("num_ctx")
@@ -135,6 +165,7 @@ def build_options_from_prefs(
     temperature_custom: float | None = None,
     num_predict: int | None = None,
     base_options: dict[str, Any] | None = None,
+    model_max_ctx: int | None = None,
 ) -> dict[str, Any] | None:
     """Materialize the options map for storage / request (omit empty)."""
     options: dict[str, Any] = dict(base_options) if base_options else {}
@@ -142,6 +173,14 @@ def build_options_from_prefs(
     tier = (context_tier or "auto").lower()
     if tier == "auto":
         options.pop("num_ctx", None)
+    elif tier == "fit":
+        # Resolved per request from the observed maximum; nothing is stored,
+        # so a model swap or a re-pull re-resolves instead of going stale.
+        nctx = fit_num_ctx(model_max_ctx)
+        if nctx is not None:
+            options["num_ctx"] = nctx
+        else:
+            options.pop("num_ctx", None)
     elif tier == "custom":
         if num_ctx_custom is not None and num_ctx_custom > 0:
             options["num_ctx"] = int(num_ctx_custom)
@@ -177,6 +216,20 @@ def build_options_from_prefs(
         options.pop("num_predict", None)
 
     return options or None
+
+
+def max_context_from_profile(profile: dict[str, Any] | None) -> int | None:
+    """Read the observed maximum context from a profile (None when unknown)."""
+    if not isinstance(profile, dict):
+        return None
+    obs = profile.get("observations")
+    if not isinstance(obs, dict):
+        return None
+    raw = obs.get("max_context")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    n = int(raw)
+    return n if n > 0 else None
 
 
 @dataclass(frozen=True)
@@ -338,6 +391,7 @@ class ModelProfileService:
                 temperature_custom=float(temp_custom) if temp_custom is not None else None,
                 num_predict=int(npred) if npred is not None else None,
                 base_options=stored or None,
+                model_max_ctx=max_context_from_profile(profile),
             )
         elif stored:
             options = dict(stored)
@@ -449,6 +503,78 @@ class ModelProfileService:
                 obs["digest"] = dig
 
             obs["last_metrics"] = metrics
+            profile["observations"] = obs
+            if dig is not None:
+                profile["last_seen_digest"] = dig
+            profiles[name] = profile
+            result = dict(profile)
+
+        self._save(mutate)
+        return result
+
+    def max_context(self, model_name: str) -> int | None:
+        """Observed maximum context for ``model_name`` (None when unknown)."""
+        return max_context_from_profile(self.get_profile(model_name))
+
+    def record_model_limits(
+        self,
+        model_name: str,
+        *,
+        max_context: int | None,
+        digest: str | None = None,
+    ) -> dict[str, Any]:
+        """Store the model's reported maximum context under observations.
+
+        Digest-scoped like the other observations: a re-pull under the same
+        name discards it rather than carrying a stale limit forward.
+        """
+        if not model_name or not str(model_name).strip():
+            return {}
+        if isinstance(max_context, bool) or not isinstance(max_context, (int, float)):
+            return {}
+        ctx = int(max_context)
+        if ctx <= 0:
+            return {}
+        name = str(model_name)
+
+        # Re-reading the same limit on every Model Fit refresh must not churn
+        # the settings file.
+        current = self.get_profile(name)
+        if max_context_from_profile(current) == ctx:
+            obs_now = current.get("observations")
+            obs_digest = obs_now.get("digest") if isinstance(obs_now, dict) else None
+            if digest is None or obs_digest == digest:
+                return dict(current)
+
+        result: dict[str, Any] = {}
+
+        def mutate(data: dict) -> None:
+            nonlocal result
+            profiles = data.setdefault("model_profiles", {})
+            if not isinstance(profiles, dict):
+                profiles = {}
+                data["model_profiles"] = profiles
+            profile = profiles.get(name)
+            if not isinstance(profile, dict):
+                profile = {}
+                profiles[name] = profile
+
+            dig = digest
+            if dig is None:
+                dig = profile.get("last_seen_digest")
+                if not isinstance(dig, str):
+                    dig = None
+
+            obs = profile.get("observations")
+            if not isinstance(obs, dict):
+                obs = {}
+            existing = obs.get("digest")
+            if dig is not None and isinstance(existing, str) and existing != dig:
+                obs = {"digest": dig}
+            elif dig is not None:
+                obs["digest"] = dig
+
+            obs["max_context"] = ctx
             profile["observations"] = obs
             if dig is not None:
                 profile["last_seen_digest"] = dig

@@ -48,7 +48,9 @@ from model_profile import (
     RESPONSE_STYLE_LABELS,
     RESPONSE_STYLE_TEMPERATURE,
     ModelProfileService,
+    fit_num_ctx,
     keep_alive_id_for_value,
+    max_context_from_profile,
     num_ctx_for_tier,
 )
 from ollama_client import ModelDescriptor, OllamaClient, OllamaError
@@ -605,6 +607,7 @@ class ConnectionPreferences:
                     else:
                         tier = "custom"
             self._set_combo_by_id(self._context_row, CONTEXT_TIER_IDS, tier)
+            self._update_context_row_subtitle()
             if self._custom_ctx_row is not None:
                 nctx = options.get("num_ctx")
                 if isinstance(nctx, (int, float)) and int(nctx) > 0:
@@ -716,6 +719,35 @@ class ConnectionPreferences:
             self._fit_warning_row.set_visible(False)
             self._fit_warning_row.set_subtitle("")
 
+    def _update_context_row_subtitle(self) -> None:
+        """Explain the Fit tier's resolved size; no subtitle for fixed tiers."""
+        if self._context_row is None:
+            return
+        if self._combo_id(self._context_row, CONTEXT_TIER_IDS) != "fit":
+            self._context_row.set_subtitle("")
+            return
+        model = self._bound_model
+        max_ctx = self._profiles.max_context(model) if model else None
+        resolved = fit_num_ctx(max_ctx)
+        if resolved is None:
+            self._context_row.set_subtitle(
+                _markup_safe(
+                    "Model maximum not known yet — Ollama's default applies "
+                    "until it is read"
+                )
+            )
+        elif max_ctx is not None and max_ctx > resolved:
+            self._context_row.set_subtitle(
+                _markup_safe(
+                    f"{format_tokens(resolved)} — capped; this model supports "
+                    f"{format_tokens(max_ctx)}"
+                )
+            )
+        else:
+            self._context_row.set_subtitle(
+                _markup_safe(f"{format_tokens(resolved)} — this model's maximum")
+            )
+
     def _profile_num_ctx(self, model: str | None) -> int | None:
         if not model:
             return None
@@ -725,6 +757,7 @@ class ConnectionPreferences:
         return num_ctx_for_tier(
             str(tier) if isinstance(tier, str) else None,
             options if isinstance(options, dict) else None,
+            model_max_ctx=max_context_from_profile(profile),
         )
 
     def _refresh_model_fit_async(self) -> None:
@@ -877,6 +910,15 @@ class ConnectionPreferences:
             measured_peak = None
 
         max_ctx = merged.context_length if merged is not None else None
+        if max_ctx:
+            # Keep the "Fit to model" tier resolvable even when the chat-side
+            # probe missed; observational write, no preference is touched.
+            try:
+                self._profiles.record_model_limits(model, max_context=max_ctx)
+            except Exception:  # noqa: BLE001
+                pass
+            if model == self._bound_model:
+                self._update_context_row_subtitle()
         allocated = running.context_length if running is not None else None
         self._apply_conversation_usage(
             model=model,
@@ -995,6 +1037,7 @@ class ConnectionPreferences:
         if self._model_loading:
             return
         tier = self._combo_id(self._context_row, CONTEXT_TIER_IDS)
+        self._update_context_row_subtitle()
         if self._custom_ctx_row is not None:
             self._custom_ctx_row.set_visible(tier == "custom")
             if tier != "custom" and tier in CONTEXT_TIER_NUM_CTX:
@@ -1017,6 +1060,7 @@ class ConnectionPreferences:
                 self._set_combo_by_id(self._context_row, CONTEXT_TIER_IDS, "custom")
                 if self._custom_ctx_row is not None:
                     self._custom_ctx_row.set_visible(True)
+                self._update_context_row_subtitle()
             finally:
                 self._model_loading = False
         self._save_model_prefs()

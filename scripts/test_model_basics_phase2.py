@@ -11,8 +11,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from model_profile import (  # noqa: E402
+    CONTEXT_FIT_CEILING,
     ModelProfileService,
     build_options_from_prefs,
+    fit_num_ctx,
     keep_alive_id_for_value,
 )
 from ollama_client import build_chat_body, build_generate_body  # noqa: E402
@@ -185,6 +187,63 @@ def main() -> int:
         r.check(
             "stored under exact name beta:2",
             "beta:2" in (disk.get("model_profiles") or {}),
+        )
+
+        print("\n[7] Fit tier resolves from the observed maximum", flush=True)
+        r.check("fit clamps to ceiling", fit_num_ctx(131072) == CONTEXT_FIT_CEILING)
+        r.check("fit keeps smaller maximum", fit_num_ctx(8192) == 8192)
+        r.check("fit without maximum omits", fit_num_ctx(None) is None)
+        r.check("fit rejects nonsense", fit_num_ctx(0) is None and fit_num_ctx(True) is None)
+
+        svc.ensure_digest("delta:4", "sha256:aaa")
+        svc.apply_model_basics("delta:4", context_tier="fit", response_style="balanced")
+        pre = svc.request_params("delta:4")
+        r.check(
+            "fit omits num_ctx until maximum is known",
+            pre.options is None or "num_ctx" not in pre.options,
+            str(pre.options),
+        )
+
+        svc.record_model_limits("delta:4", max_context=131072, digest="sha256:aaa")
+        r.check("maximum readable", svc.max_context("delta:4") == 131072)
+        post = svc.request_params("delta:4")
+        r.check(
+            "fit resolves clamped num_ctx",
+            post.options is not None
+            and post.options.get("num_ctx") == CONTEXT_FIT_CEILING,
+            str(post.options),
+        )
+        r.check(
+            "fit stores no num_ctx in preferences",
+            "num_ctx" not in (svc.get_profile("delta:4").get("options") or {}),
+            str(svc.get_profile("delta:4").get("options")),
+        )
+
+        # A re-pull under the same name must not carry the old limit forward.
+        svc.ensure_digest("delta:4", "sha256:bbb")
+        r.check("maximum discarded on digest change", svc.max_context("delta:4") is None)
+        r.check(
+            "fit falls back to omission after digest change",
+            "num_ctx" not in (svc.request_params("delta:4").options or {}),
+        )
+        r.check(
+            "fit tier survives digest change",
+            svc.get_profile("delta:4").get("context_tier") == "fit",
+        )
+
+        svc.record_model_limits("delta:4", max_context=4096, digest="sha256:bbb")
+        small = svc.request_params("delta:4")
+        r.check(
+            "fit tracks a smaller model maximum",
+            small.options is not None and small.options.get("num_ctx") == 4096,
+            str(small.options),
+        )
+
+        # Other tiers ignore the observed maximum entirely.
+        svc.apply_model_basics("delta:4", context_tier="8k", response_style="balanced")
+        r.check(
+            "8k unaffected by observed maximum",
+            svc.request_params("delta:4").options.get("num_ctx") == 8192,
         )
 
     print(f"\nPhase 2 results: {len(r.ok)} passed, {len(r.fail)} failed", flush=True)
