@@ -155,6 +155,8 @@ class ConnectionPreferences:
         self._fit_generation = 0
         self._think_supported = False
         self._bound_model: str | None = None
+        # (model, context_length) Ollama last reported for a loaded model.
+        self._allocated_ctx: tuple[str, int] | None = None
 
     def ensure_panel(self) -> Gtk.Widget:
         """Build the settings page once; reuse thereafter."""
@@ -175,8 +177,6 @@ class ConnectionPreferences:
         self._apply_form(show_errors=False)
         self._save_model_prefs()
         self._bound_model = None
-        # (model, context_length) Ollama last reported for a loaded model.
-        self._allocated_ctx: tuple[str, int] | None = None
 
     def refresh_selected_model(self) -> None:
         """Reload model controls for the window's current model (no cross-leak)."""

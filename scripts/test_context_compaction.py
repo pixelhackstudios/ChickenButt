@@ -262,6 +262,55 @@ def test_engine(r: Results) -> None:
         r.check("cancel: no summary call", eng.client.calls == [])
         store.close()
 
+
+def test_settings_opens(r: Results) -> None:
+    """Regression: 1.3.0 Settings crashed on open (attribute set in dismiss)."""
+    import gi
+
+    gi.require_version("Adw", "1")
+    from gi.repository import Adw, Gio, GLib
+
+    from connection_settings import ConnectionPreferences
+    from model_profile import ModelProfileService
+    from ollama_client import OllamaClient
+
+    print("\n[13] Settings page opens and closes on Auto", flush=True)
+
+    with tempfile.TemporaryDirectory(prefix="cb-compact-") as td:
+        d = Path(td)
+        sp = d / "settings.json"
+        sp.write_text("{}\n", encoding="utf-8")
+        profiles = ModelProfileService(settings_dir=d, settings_path=sp)
+        Adw.init()
+        app = Adw.Application(
+            application_id="dev.local.chickenbutt.compaction-test",
+            flags=Gio.ApplicationFlags.NON_UNIQUE,
+        )
+        app.register()
+        win = Adw.ApplicationWindow(application=app)
+        prefs = ConnectionPreferences(
+            parent=win,
+            client=OllamaClient("http://127.0.0.1:9", timeout=1.0),
+            profiles=profiles,
+            get_selected_model=lambda: "m:1",
+            settings_dir=d,
+            settings_path=sp,
+        )
+        err = ""
+        try:
+            prefs.present()
+            ctx = GLib.MainContext.default()
+            for _ in range(50):
+                ctx.iteration(False)
+            prefs.dismiss()
+            prefs.present()
+        except Exception as exc:  # noqa: BLE001
+            err = f"{type(exc).__name__}: {exc}"
+        r.check("present/dismiss/present raise nothing", not err, err)
+        sub = prefs._context_row.get_subtitle() if prefs._context_row else ""
+        r.check("Auto subtitle shown", "Sized by Ollama" in (sub or ""), sub or "")
+        win.destroy()
+
 def main() -> int:
     r = Results()
     cpt = DEFAULT_CHARS_PER_TOKEN
@@ -404,6 +453,7 @@ def main() -> int:
 
     test_store(r)
     test_engine(r)
+    test_settings_opens(r)
 
     print(f"\nCompaction results: {len(r.ok)} passed, {len(r.fail)} failed", flush=True)
     if r.fail:
