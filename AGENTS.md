@@ -75,3 +75,23 @@ These instructions apply to every agent working in this repository.
 * State whether any commit, push, pull request, merge, or publication occurred.
 * Separate observed facts, supported risks, proposed changes, and decisions requiring authorization.
 * Keep reports concise.
+
+<!-- coding-harness:start -->
+
+# Coding harness
+
+A claim that behavior changed needs a command result in `.harness/evidence.jsonl`.
+The recorder's exit code is the command's exit code. It does not use a shell, so pipes are not recorded.
+
+```bash
+python .harness/record_check.py --ledger .harness/evidence.jsonl --label baseline -- <command>
+```
+
+## Commands written in this repo
+
+- test: `not detected`
+
+`not detected` means no command was found in project files. Do not invent a substitute and treat it as proof.
+`.harness/evidence.jsonl` is local run output.
+
+<!-- coding-harness:end -->
